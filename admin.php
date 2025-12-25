@@ -35,16 +35,15 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
 		// Voeg settings section toe
 		add_settings_section(
 			'z_user_onetime_login_main_section',
-			 esc_html__('Global settings', 'z-user-onetime-login'),
+			esc_html__('Global settings', 'z-user-onetime-login'),
 			'z_user_onetime_login_main_section_text',
 			'z_user_onetime_login_plugin'
 		);
 
-
         // Field: Role selection
 		add_settings_field(
 			'z_user_onetime_login_select_roles',
-			 esc_html__('Excluded roles', 'z-user-onetime-login') . '<span class="description">' .
+			esc_html__('Excluded roles', 'z-user-onetime-login') . '<span class="description">' .
                 esc_html__( 'Some user roles should not have a fast login', 'z-user-onetime-login' ) . '</span>', 
 			'z_user_onetime_login_render_roles_checkboxes',
 			'z_user_onetime_login_plugin',
@@ -74,6 +73,15 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
 			'z_user_onetime_login_mail_content',
 			esc_html__('Mail content', 'z-user-onetime-login'), 
 			'z_user_onetime_login_render_mail_content',
+			'z_user_onetime_login_plugin',
+			'z_user_onetime_login_main_section'
+		);
+
+        // Field: Allow user request
+		add_settings_field(
+			'z_user_onetime_login_user_request',
+			esc_html__('User request', 'z-user-onetime-login'), 
+			'z_user_onetime_login_render_user_request_checkbox',
 			'z_user_onetime_login_plugin',
 			'z_user_onetime_login_main_section'
 		);
@@ -169,6 +177,18 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
 
 
 
+    function z_user_onetime_login_render_user_request_checkbox() {
+        $options = get_option( 'z_user_onetime_login_plugin_options' );
+        $allow_user_request = isset( $options['allow_user_request'] ) ? $options['allow_user_request'] : false;
+        printf(
+            '<label><input type="checkbox" name="z_user_onetime_login_plugin_options[allow_user_request]" value="1" %s> %s</label><br>',
+            checked( $allow_user_request, true, false ),
+            esc_html( __('Allow users to request a new One-time Login Link, the way they reset a password', 'z-user-onetime-login') )
+        );
+    }
+
+
+
     function z_user_onetime_login_plugin_options_validate( $input ) {
         $output = array();
 
@@ -182,6 +202,10 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
 
         if ( isset( $input['mail_content'] ) ) {
             $output['mail_content'] = wp_kses_post( $input['mail_content'] );
+        }
+
+        if ( isset( $input['allow_user_request'] ) ) {
+            $output['allow_user_request'] = true;
         }
 
         if ( isset( $input['roles'] ) && is_array( $input['roles'] ) ) {

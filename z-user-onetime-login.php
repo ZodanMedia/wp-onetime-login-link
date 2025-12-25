@@ -7,7 +7,7 @@
  * Requires at least: 5.5
  * Tested up to: 6.9
  * Description: Let users login once without a password
- * Version: 0.0.1
+ * Version: 0.0.2
  * Author: Zodan
  * Author URI: https://zodan.nl
  * Text Domain: z-user-onetime-login
@@ -37,7 +37,7 @@ add_action( 'plugins_loaded', function() {
 class Z_User_Onetime_Login {
 
 	protected static $instance = NULL;
-	public $plugin_version = '0.0.1';
+	public $plugin_version = '0.0.2';
 	public $plugin_url = '';
 	public $plugin_path = '';
 
@@ -63,6 +63,14 @@ class Z_User_Onetime_Login {
 
 		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), [ $this, 'add_plugin_settings_link' ] );
 
+		add_filter( 'login_message', [ $this, 'add_login_request_link' ] );
+		add_action( 'login_init', [ $this, 'redirect_from_password_flow' ] );
+		
+		add_shortcode( 'zloginonce_request_form', [ $this, 'loginonce_request_form_shortcode' ] );
+
+		// add_action( 'admin_post_nopriv_zloginonce_request',  [ Z_User_Onetime_Login::get_instance(), 'handle_self_login_request' ]);
+		add_action( 'admin_post_nopriv_zloginonce_request',  [ $this, 'handle_self_login_request' ]);
+
 		if ( is_admin() ) {
 			add_action( 'admin_init', [ $this, 'handle_send_login_once_mail' ] );
 			include( $this->plugin_path . 'admin.php' );
@@ -73,7 +81,6 @@ class Z_User_Onetime_Login {
 				}
 			});
 		}
-
 
 		// Admin front end
 		if ( ! is_admin() && ! is_user_logged_in() ) {
@@ -143,31 +150,70 @@ class Z_User_Onetime_Login {
 			return;
 		}
 
+		$expires = (int) get_user_meta( $user_id, 'z_login_once_expires', true );
+
+		if ( empty( $expires ) || time() > $expires ) {
+			return;
+		}
+
 		// Verify WP nonce 
 		if ( ! wp_verify_nonce( $nonce, 'z_login_once' ) ) {
 			return;
 		}
 
-		// 🔐 Login
+
+
+		/**
+		 * =====================================================
+		 * 🌐 MULTISITE: switch after validation
+		 * =====================================================
+		 */
+		if ( is_multisite() ) {
+			$primary_blog = (int) get_user_meta( $user_id, 'primary_blog', true );
+
+			if ( $primary_blog ) {
+				switch_to_blog( $primary_blog );
+			}
+		}
+
+
+		/**
+		 * =====================================================
+		 * 🔐 LOGIN
+		 * =====================================================
+		 */
+
 		// Set WP authorisation cookie
-		wp_set_auth_cookie( $user_id, true );
+		// wp_set_auth_cookie( $user_id, true );
+		wp_set_auth_cookie( $user_id, true, is_multisite() );
 
 		// if you want is_user_logged_in to work you should set `wp_set_current_user` explicityly
 		wp_set_current_user( $user_id );
 
 		// The WP login action
 		do_action( 'wp_login', $user->user_login, $user );	// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- We are not invoking a plugin-specific action, but actually activating wp_login
-    	
 
-		// 🔄 Renew the nonce → link is now invalid
-		update_user_meta(
-			$user_id,
-			'z_login_once_nonce',
-			wp_create_nonce( 'z_login_once' )
+		/**
+		 * =====================================================
+		 * 🔄 Renew the nonce → link is now invalid
+		 * =====================================================
+		 */
+		update_user_meta( $user_id, 'z_login_once_nonce', wp_create_nonce( 'z_login_once' ) );
+		delete_user_meta( $user_id, 'z_login_once_expires' );
+
+
+		/**
+		 * =====================================================
+		 * 🌐 MULTISITE: restore context
+		 * =====================================================
+		 */
+		if ( is_multisite() ) {
+			restore_current_blog();
+		}
+
+		wp_safe_redirect(
+			is_multisite() ? network_home_url() : home_url()
 		);
-
-		// Redirect to avoid reuse / refresh
-		wp_safe_redirect( home_url() );
 		exit;
 	}
 
@@ -225,8 +271,15 @@ class Z_User_Onetime_Login {
 
 		$nonce = wp_create_nonce( 'z_login_once' );
 		update_user_meta( $user->ID, 'z_login_once_nonce', $nonce );
+		update_user_meta( $user->ID, 'z_login_once_expires', time() + HOUR_IN_SECONDS );
 
-		$link_url = add_query_arg( ['zloginonce' => $nonce], home_url() );
+
+		// $link_url = add_query_arg( ['zloginonce' => $nonce], home_url() );
+		$link_url = add_query_arg(
+    		[ 'zloginonce' => $nonce ],
+    		is_multisite() ? network_home_url() : home_url()
+		);
+
 
 		$options = get_option( 'z_user_onetime_login_plugin_options' );
 
@@ -252,6 +305,141 @@ class Z_User_Onetime_Login {
 		wp_safe_redirect($redirect_url);
 		exit;
 	}
+
+
+	public function add_login_request_link ( $message ) {
+
+		$options = get_option( 'z_user_onetime_login_plugin_options' );
+
+		if ( empty( $options['allow_user_request'] ) ) {
+			return $message;
+		}
+
+		$url = wp_lostpassword_url() . '&zloginonce=1';
+
+		$message .= '<p class="message zloginonce-link">
+			<a href="' . esc_url( $url ) . '">' .
+			esc_html__( 'Loginlink aanvragen', 'z-user-onetime-login' ) .
+			'</a>
+		</p>';
+
+		return $message;
+	}
+
+
+	public function redirect_from_password_flow() {
+		if ( isset( $_GET['zloginonce'] ) ) {
+			wp_safe_redirect( site_url( '/onetime-login/' ) );
+			exit;
+		}
+	}
+
+
+	protected function is_rate_limited( $email ) {
+
+		$ip   = ! empty($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) : '';
+		$key  = 'zloginonce_rl_' . md5( $ip . $email );
+
+		if ( get_transient( $key ) ) {
+			return true;
+		}
+
+		set_transient( $key, 1, MINUTE_IN_SECONDS * 10 ); // 10 min
+		return false;
+	}
+
+
+	public function loginonce_request_form_shortcode() {
+
+		if ( is_user_logged_in() ) {
+			return '<p>' . __( 'Je bent al ingelogd.', 'z-user-onetime-login' ) . '</p>';
+		}
+
+   		ob_start();
+   		?>
+			<form method="post">
+				<p>
+					<label for="zloginonce_email">
+						<?php esc_html_e( 'Email address', 'z-user-onetime-login' ); ?>
+					</label>
+					<input type="email" name="zloginonce_email" required>
+				</p>
+
+				<?php wp_nonce_field( 'zloginonce_request', 'zloginonce_nonce' ); ?>
+
+				<input type="hidden" name="action" value="zloginonce_request">
+
+				<p>
+					<button type="submit">
+						<?php esc_html_e( 'Send me a login link', 'z-user-onetime-login' ); ?>
+					</button>
+				</p>
+			</form>
+		<?php
+		
+		return ob_get_clean();
+	}
+
+
+	public function handle_self_login_request() {
+
+		if (
+			empty( $_POST['zloginonce_email'] ) ||
+			empty( $_POST['zloginonce_nonce'] )
+		) {
+			wp_safe_redirect( wp_get_referer() );
+			exit;
+		}
+
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['zloginonce_nonce'] ) ), 'zloginonce_request' ) ) {
+			wp_safe_redirect( wp_get_referer() );
+			exit;
+		}
+
+		$email = sanitize_email( wp_unslash( $_POST['zloginonce_email'] ) );
+		$user  = get_user_by( 'email', $email );
+
+		if ( $this->is_rate_limited( $email ) ) {
+    		wp_safe_redirect( add_query_arg( 'requested', '1', wp_get_referer() ) );
+    		exit;
+		}
+
+		// Altijd generiek antwoord → geen user enumeration
+		if ( ! $user || self::user_has_excluded_roles( $user->ID ) ) {
+			wp_safe_redirect( add_query_arg( 'requested', '1', wp_get_referer() ) );
+			exit;
+		}
+
+		// Genereer one-time nonce
+		$nonce = wp_create_nonce( 'z_login_once' );
+		update_user_meta( $user->ID, 'z_login_once_nonce', $nonce );
+
+		$link_url = add_query_arg(
+			[ 'zloginonce' => $nonce ],
+			home_url()
+		);
+
+		// Mail (hergebruik je bestaande opties)
+		$options = get_option( 'z_user_onetime_login_plugin_options' );
+
+		$subject = $options['mail_subject'];
+		$content = str_replace(
+			['{{displayname}}','{{firstname}}','{{zloginlink}}'],
+			[$user->display_name, $user->first_name, esc_url( $link_url )],
+			wpautop( $options['mail_content'] )
+		);
+
+		wp_mail(
+			$user->user_email,
+			$subject,
+			$content,
+			['Content-Type: text/html; charset=UTF-8']
+		);
+
+		wp_safe_redirect( add_query_arg( 'requested', '1', wp_get_referer() ) );
+		exit;
+	}
+
 
 }
 
