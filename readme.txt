@@ -35,16 +35,16 @@ This plugin is under active development. Any feature requests are welcome at [pl
 
 == Installation ==
 
-= Install the Theme Switcher from within WordPress =
+= Install the One-time Login Link from within WordPress =
 
 1. Visit the plugins page within your dashboard and select ‘Add New’;
-1. Search for ‘Z Theme Switcher’;
+1. Search for ‘Z One-time Login Link’;
 1. Activate the plugin from your Plugins page;
 1. Go to ‘after activation’ below.
 
 = Install manually =
 
-1. Unzip the Theme Switcher zip file
+1. Unzip the One-time Login Link zip file
 2. Upload the unzipped folder to the /wp-content/plugins/ directory;
 3. Activate the plugin through the ‘Plugins’ menu in WordPress;
 4. Go to ‘after activation’ below.
@@ -53,9 +53,9 @@ This plugin is under active development. Any feature requests are welcome at [pl
 = After activation =
 
 1. On the Plugins page in WordPress you will see a 'settings' link below the plugin name;
-2. On the Theme Switcher settings page:
-**  Select the theme you want to be able to switch to
-**  Select the roles with the permission to switch
+2. On the One-time Login Link settings page:
+**  Select which user roles to exclude
+**  Set the mail settings
 3. Save your settings and you’re done!
 
 
@@ -68,17 +68,13 @@ Yep. It does.
 
 = The Switch theme button on the front-end is not showing, can you help? =
 
-Hm. It could be that you are using a theme that does not call wp_footer() (which is the hook it is linked to).
-In that case, you can use the custom hook/action for this.
-Just add the following php code (make sure it is somehow called on every page):
-`<?php do_action('z_user_onetime_login_show_toggle'); ?>`
 
 
 = Do you have plans to improve the plugin? =
 
 We currently have on our roadmap:
 * Adding translations
-* Adding a custom capability (to be used next to roles, for those who want to add a custom role)
+* Addin
 * Set the preference per user
 
 If you have a feature suggestion, send us an email at [plugins@zodan.nl](plugins@zodan.nl).
