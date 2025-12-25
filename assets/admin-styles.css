@@ -1,0 +1,86 @@
+/**
+ * Plugin Name: Z Theme Switcher
+ * Admin styles
+ * 
+ * Author: Zodan
+ * Author URI: https://zodan.nl
+ */
+:root {
+    --z-padding-left: 6px;
+    --z-padding-right: 6px;
+}
+#adminmenu a[href*="?page=z_user_onetime_login"]:before {
+    display: inline-block;
+    content: "";
+    width: 18px;
+    height: 18px;
+    opacity: 0.6;
+    vertical-align: bottom;
+    margin-right: 8px;
+    background-color: transparent;
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-image: url("data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyBpZD0iQ2FwYV8xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZlcnNpb249IjEuMSIgdmlld0JveD0iMCAwIDUxMiA1MTIiPjxwYXRoIHN0eWxlPSJmaWxsOiNmZmYiIGQ9Ik0yNzMuMSwyNzEuMXYzNS4yYzAsOS43LTcuOSwxNy42LTE3LjYsMTcuNnMtMTcuNi03LjktMTcuNi0xNy42di0zNS4yYzAtOS43LDcuOS0xNy42LDE3LjYtMTcuNnMxNy42LDcuOSwxNy42LDE3LjZaTTI1NS41LDEzMC4xYy0yNC4zLDAtNDQuMSwxOS43LTQ0LjEsNDQuMXYyNi40aDg4LjF2LTI2LjRjMC0yNC4zLTE5LjctNDQuMS00NC4xLTQ0LjFoLjFaTTUxMiwyNTZjMCwxNDEuMi0xMTQuOCwyNTYtMjU2LDI1NlMwLDM5Ny4yLDAsMjU2LDExNC44LDAsMjU2LDBzMjU2LDExNC44LDI1NiwyNTZaTTM3OC44LDIzNS45YzAtMTkuNC0xNS44LTM1LjItMzUuMi0zNS4yaC04Ljh2LTI2LjRjMC00My44LTM1LjUtNzkuMy03OS4zLTc5LjNzLTc5LjMsMzUuNS03OS4zLDc5LjN2MjYuNGgtOC44Yy0xOS40LDAtMzUuMiwxNS44LTM1LjIsMzUuMnYxMDUuN2MwLDE5LjQsMTUuOCwzNS4yLDM1LjIsMzUuMmgxNzYuMmMxOS40LDAsMzUuMi0xNS44LDM1LjItMzUuMnYtMTA1LjdoMFoiLz48L3N2Zz4=")
+}
+#adminmenu .current a[href*="?page=z_user_onetime_login"]:before {
+    opacity: 0.9;
+}
+.form-table th span.description {
+    display: block;
+    font-weight: 400;
+    margin-top: 6px;
+}
+.btn-switch-faux {
+    background:#25ab84;
+    color: white;
+    border-radius: 5px;
+    padding: 0 8px;
+}
+
+#zlinktext-example-frame {
+	display: none;
+}
+#zlinktext-example-frame.show {
+	display: inline-block;
+}
+
+.zThanks {
+    position: absolute;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+
+}
+.zThanks a {
+    text-decoration: none;
+    color: inherit;
+}
+.zThanks .heart {
+	fill: #F6017A;
+}
+.zThanks a {
+    text-decoration: none;
+    color: inherit;
+}
+.zThanks a:hover {
+    text-decoration: underline;
+    color: #F6017A;
+}
+.zThanks svg {
+	width: 14px;
+	height: auto;
+	vertical-align: middle;
+	margin: 0 0.4rem;
+}
+.zThanks svg {
+	animation: 1.75s linear infinite z-heart-pulse;
+}
+@keyframes z-heart-pulse {
+	0% { transform: scale(1); }
+	20% { transform: scale(1.2); }
+	40% { transform: scale(1); }
+	60% { transform: scale(1.2); }
+	100% { transform: scale(1); }
+}
