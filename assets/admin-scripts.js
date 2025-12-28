@@ -19,20 +19,18 @@
 			});
 		}
 
+
 		const z_use_rate_limit_input = document.getElementById('z_use_rate_limit');
 		const z_rate_limit_value_input = document.getElementById('z_rate_limit_value');
-		if( z_use_rate_limit_input.checked) {
-			z_rate_limit_value_input.removeAttribute('disabled');
-		} else {
-			z_rate_limit_value_input.setAttribute('disabled', 'disabled');
+
+		function zUpdateRateLimitState() {
+			z_rate_limit_value_input.disabled = !z_use_rate_limit_input.checked;
 		}
-		z_use_rate_limit_input.addEventListener('click', function(){
-			if(z_use_rate_limit_input.checked) {
-				z_rate_limit_value_input.removeAttribute('disabled');
-			} else {
-				z_rate_limit_value_input.setAttribute('disabled', 'disabled');
-			}
-		});
+		// Run once on load
+		zUpdateRateLimitState();
+
+		// And in case of changes
+		z_use_rate_limit_input.addEventListener('change', zUpdateRateLimitState);
 
     });
 })(jQuery);

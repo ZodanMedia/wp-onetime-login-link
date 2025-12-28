@@ -200,7 +200,7 @@ if ( !function_exists( 'z_onetime_login_link_register_settings' ) ) {
     function z_onetime_login_link_render_mail_subject() {
         $options = get_option( 'z_onetime_login_link_plugin_options' );
 
-        $mail_subject = isset( $options['mail_subject'] ) ? $options['mail_subject'] : __('Your One Time Login link', 'z-onetime-login-link');
+        $mail_subject = isset( $options['mail_subject'] ) ? $options['mail_subject'] : __('Your One-time Login link', 'z-onetime-login-link');
 
         printf('<label><strong class="screen-reader-text">%s:</strong> <input type="text" name="z_onetime_login_link_plugin_options[mail_subject]" value="%s"></label>',
             esc_html(__('Subject', 'z-onetime-login-link')),
@@ -215,7 +215,7 @@ if ( !function_exists( 'z_onetime_login_link_register_settings' ) ) {
 
 		$default_mail_content = '<p>'.__('Hello {{firstname}}', 'z-onetime-login-link').'</p>';
         $default_mail_content .= '<p>'.__('With the following link you can directly log in without having to enter your password.', 'z-onetime-login-link').'</p>';
-        $default_mail_content .= '<p>{{zloginlink}}</p><p>'.__('This link can be used one time only.', 'z-onetime-login-link').'</p>';
+        $default_mail_content .= '<p>{{zloginlink}}</p><p>'.__('This link can be used only once.', 'z-onetime-login-link').'</p>';
 
         $mail_content =  ! empty( $options['mail_content'] ) ? $options['mail_content'] : $default_mail_content;
 
@@ -247,7 +247,7 @@ if ( !function_exists( 'z_onetime_login_link_register_settings' ) ) {
         printf(
             '<label><input type="checkbox" name="z_onetime_login_link_plugin_options[allow_user_request]" value="1" %s> %s</label><br>',
             checked( $allow_user_request, true, false ),
-            esc_html( __('Allow users to request a new One-time Login Link on the login form, similar to how reset a password.', 'z-onetime-login-link') )
+            esc_html( __('Allow users to request a new One-time Login Link on the login form, similar to the reset password method.', 'z-onetime-login-link') )
         );
     }   
 
@@ -365,7 +365,7 @@ if ( !function_exists( 'z_onetime_login_link_register_settings' ) ) {
         add_filter('admin_footer_text', 'z_onetime_login_link_admin_footer_print_thankyou', 900);
         ?>
         <div class="wrap">
-            <h1><?php esc_html_e('Z User One Time Login settings', 'z-onetime-login-link'); ?></h1>
+            <h1><?php esc_html_e('Z One-time Login Link settings', 'z-onetime-login-link'); ?></h1>
             <form action="options.php" method="post">
                 <?php
                 settings_fields( 'z_onetime_login_link_plugin_options' );
