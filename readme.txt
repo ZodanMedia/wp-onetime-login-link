@@ -6,8 +6,8 @@ Tags: user, login, direct login, theme development, development
 Requires at least: 5.5
 Tested up to: 6.9
 Description: Let users login once without a password
-Version: 0.0.2
-Stable tag: 0.0.2
+Version: 0.0.3
+Stable tag: 0.0.3
 Author: Zodan
 Author URI: https://zodan.nl
 Text Domain: z-user-onetime-login
@@ -83,6 +83,9 @@ If you have a feature suggestion, send us an email at [plugins@zodan.nl](plugins
 
 
 == Changelog ==
+
+= 0.0.3 =
+* Added settings for custom expiration
 
 = 0.0.2 =
 * Added possibility to request a login link (on the login screen)

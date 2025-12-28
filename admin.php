@@ -110,6 +110,15 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
 			'z_user_onetime_login_other_options_section'
 		);
 
+        // Field: Expire time
+		add_settings_field(
+			'z_user_onetime_login_user_token_expire_time',
+			esc_html__('Expire time', 'z-user-onetime-login'), 
+			'z_user_onetime_login_render_token_expire_time',
+			'z_user_onetime_login_plugin',
+			'z_user_onetime_login_other_options_section'
+		);
+
         // Field: Use rate limiting
 		add_settings_field(
 			'z_user_onetime_login_user_request_rate_limit',
@@ -192,6 +201,7 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
         );
     }
 
+
     function z_user_onetime_login_render_mail_content() {
         $options = get_option( 'z_user_onetime_login_plugin_options' );
 
@@ -230,6 +240,21 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
         );
     }
 
+    function z_user_onetime_login_render_token_expire_time() {
+        $options = get_option( 'z_user_onetime_login_plugin_options' );
+
+        $expire_time = isset( $options['expire_time'] ) ? $options['expire_time'] : intval(HOUR_IN_SECONDS);
+
+        printf('<label><strong class="screen-reader-text">%s:</strong> <input type="number" name="z_user_onetime_login_plugin_options[expire_time]" value="%s" min="300"> %s</label>',
+            esc_html(__('Subject', 'z-user-onetime-login')),
+            esc_html( $expire_time),
+            esc_html(__('seconds', 'z-user-onetime-login')),
+        );
+    }
+
+
+    
+
 
 
     function z_user_onetime_login_render_rate_limit_checkbox() {
@@ -238,7 +263,7 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
         printf(
             '<label><input type="checkbox" name="z_user_onetime_login_plugin_options[use_rate_limit]" value="1" %s> %s</label><br>',
             checked( $use_rate_limit, true, false ),
-            esc_html( __('Use rate limiting to the user requests (max. xxx times per)', 'z-user-onetime-login') )
+            esc_html( __('Use rate limiting to the user requests (max. once every 10 minutes)', 'z-user-onetime-login') )
         );
     }
 
@@ -265,6 +290,16 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
 
         if ( isset( $input['use_rate_limit'] ) ) {
             $output['use_rate_limit'] = true;
+        }
+
+        if ( isset( $input['expire_time'] ) ) {
+            $expire_time = intval($input['expire_time']);
+            if( empty($expire_time) ) {
+                $expire_time = HOUR_IN_SECONDS;
+            } elseif ( $expire_time < 300 ) {// set minimum to 5 minutes
+                $expire_time = 300;
+            }
+            $output['expire_time'] = $expire_time;
         }
 
         if ( isset( $input['roles'] ) && is_array( $input['roles'] ) ) {

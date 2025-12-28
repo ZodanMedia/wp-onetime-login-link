@@ -40,6 +40,8 @@ class Z_User_Onetime_Login {
 	public $plugin_version = '0.0.3';
 	public $plugin_url = '';
 	public $plugin_path = '';
+	public $expire_time = HOUR_IN_SECONDS; 
+	public $rate_limit = MINUTE_IN_SECONDS * 10; // wait 10 min
 
 	public static function get_instance() {
 		NULL === self::$instance and self::$instance = new self;
@@ -57,9 +59,12 @@ class Z_User_Onetime_Login {
 		$this->plugin_url = plugins_url( '/', __FILE__ );
 		$this->plugin_path = plugin_dir_path( __FILE__ );
 
-		if ( ! defined( 'Z_USER_ONETIME_LOGIN_VERSION' ) ) {
-			define( 'Z_USER_ONETIME_LOGIN_VERSION', $this->plugin_version  );
+		$options = get_option( 'z_user_onetime_login_plugin_options' );
+		if ( ! empty( $options['expire_time'] ) ) {
+			$this->expire_time = intval( $options['expire_time'] );
 		}
+
+
 
 		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), [ $this, 'add_plugin_settings_link' ] );
 
@@ -329,7 +334,7 @@ class Z_User_Onetime_Login {
 		$token = bin2hex( random_bytes( 32 ) ); // 64 chars
 		$hash  = hash( 'sha256', $token );
 		update_user_meta( $user->ID, 'z_login_once_token', $hash );
-		update_user_meta( $user->ID, 'z_login_once_expires', time() + HOUR_IN_SECONDS );
+		update_user_meta( $user->ID, 'z_login_once_expires', time() + $this->expire_time);
 		if( ! empty( $_SERVER['REMOTE_ADDR'] ) && ! empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
 			// use fingerprinting
 			update_user_meta(
@@ -409,7 +414,7 @@ class Z_User_Onetime_Login {
 			return true;
 		}
 
-		set_transient( $key, 1, MINUTE_IN_SECONDS * 10 ); // 10 min
+		set_transient( $key, 1, $this->rate_limit );
 		return false;
 	}
 
@@ -485,7 +490,7 @@ class Z_User_Onetime_Login {
 		$token = bin2hex( random_bytes( 32 ) ); // 64 chars
 		$hash  = hash( 'sha256', $token );
 		update_user_meta( $user->ID, 'z_login_once_token', $hash );
-		update_user_meta( $user->ID, 'z_login_once_expires', time() + HOUR_IN_SECONDS );
+		update_user_meta( $user->ID, 'z_login_once_expires', time() + $this->expire_time );
 		if( ! empty( $_SERVER['REMOTE_ADDR'] ) && ! empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
 			// use fingerprinting
 			update_user_meta(
