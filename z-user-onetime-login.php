@@ -1,16 +1,16 @@
 <?php
 /**
- * Plugin Name: Z User Onetime Login
+ * Plugin Name: Z Onetime Login Link
  * Contributors: martenmoolenaar, zodannl
- * Plugin URI: https://plugins.zodan.nl/wordpress-user-onetime-login/
- * Tags: user, login, direct login, theme development, development
+ * Plugin URI: https://plugins.zodan.nl/wordpress-onetime-login-link/
+ * Tags: direct login, fast login, no password, theme development, development
  * Requires at least: 5.5
  * Tested up to: 6.9
  * Description: Let users login once without a password
  * Version: 0.0.3
  * Author: Zodan
  * Author URI: https://zodan.nl
- * Text Domain: z-user-onetime-login
+ * Text Domain: z-onetime-login-link
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
  *
@@ -28,13 +28,13 @@ if ( !defined( 'WPINC' ) ) {
  * 
  */
 add_action( 'plugins_loaded', function() {
-	$instance = Z_User_Onetime_Login::get_instance();
+	$instance = z_onetime_login_link::get_instance();
 	$instance->plugin_setup();
 } );
 
 
 
-class Z_User_Onetime_Login {
+class z_onetime_login_link {
 
 	protected static $instance = NULL;
 	public $plugin_version = '0.0.3';
@@ -58,14 +58,14 @@ class Z_User_Onetime_Login {
 
     public function plugin_setup() {
 
-		if ( ! defined( 'Z_USER_ONETIME_LOGIN_VERSION' ) ) {
-			define( 'Z_USER_ONETIME_LOGIN_VERSION', $this->plugin_version  );
+		if ( ! defined( 'Z_ONETIME_LOGIN_LINK_VERSION' ) ) {
+			define( 'Z_ONETIME_LOGIN_LINK_VERSION', $this->plugin_version  );
 		}
 
 		$this->plugin_url = plugins_url( '/', __FILE__ );
 		$this->plugin_path = plugin_dir_path( __FILE__ );
 
-		$options = get_option( 'z_user_onetime_login_plugin_options' );
+		$options = get_option( 'z_onetime_login_link_plugin_options' );
 		if ( ! empty( $options['expire_time'] ) ) {
 			$this->expire_time = intval( $options['expire_time'] );
 		}
@@ -88,7 +88,7 @@ class Z_User_Onetime_Login {
 			add_filter ('user_row_actions', [ $this, 'add_send_zloginonce_link_mail' ], 10, 2) ;
 			add_action( 'admin_notices', function() {
 				if ( filter_has_var( INPUT_GET, 'zloginonce_sent' ) ) {
-					echo '<div class="notice notice-success"><p>'.esc_html(__('One time login link sent.','z-user-onetime-login')).'</p></div>';
+					echo '<div class="notice notice-success"><p>'.esc_html(__('One time login link sent.','z-onetime-login-link')).'</p></div>';
 				}
 			});
 		}
@@ -103,7 +103,7 @@ class Z_User_Onetime_Login {
 
     public static function user_has_excluded_roles( $user_id ) {
 
-		$options = get_option( 'z_user_onetime_login_plugin_options' );
+		$options = get_option( 'z_onetime_login_link_plugin_options' );
 		$roles = $options['roles'];
 		if ( empty( $roles ) ) return false;
 
@@ -115,7 +115,7 @@ class Z_User_Onetime_Login {
 
 
     public static function add_plugin_settings_link( $links ) {
-		$settings_link = '<a href="options-general.php?page=z_user_onetime_login">' . __( 'Settings','z-user-onetime-login' ) . '</a>';
+		$settings_link = '<a href="options-general.php?page=z_onetime_login_link">' . __( 'Settings','z-onetime-login-link' ) . '</a>';
 		array_unshift( $links, $settings_link );
 		return $links;
 	}   
@@ -135,6 +135,7 @@ class Z_User_Onetime_Login {
 		 * 
 		 * No login parameter present or an empty token → bail out
 		 */
+
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		if ( empty( $_GET['zloginonce'] ) ) { 
 			return;
@@ -145,7 +146,7 @@ class Z_User_Onetime_Login {
 			return;
 		}
 
-		
+
 		// Find user by nonce (one-time mapping)
 		$users = get_users(
 			array(
@@ -158,8 +159,8 @@ class Z_User_Onetime_Login {
 
 		if ( empty( $users ) ) {
 			wp_die(
-				esc_html__( 'Invalid or expired login link.', 'z-user-onetime-login' ),
-				esc_html__( 'Login error', 'z-user-onetime-login' ),
+				esc_html__( 'Invalid or expired login link.', 'z-onetime-login-link' ),
+				esc_html__( 'Login error', 'z-onetime-login-link' ),
 				[ 'response' => 403 ]
 			);
 		}
@@ -169,16 +170,16 @@ class Z_User_Onetime_Login {
 
 		if ( ! $user ) {
 			wp_die(
-				esc_html__( 'Invalid user.', 'z-user-onetime-login' ),
-				esc_html__( 'Login error', 'z-user-onetime-login' ),
+				esc_html__( 'Invalid user.', 'z-onetime-login-link' ),
+				esc_html__( 'Login error', 'z-onetime-login-link' ),
 				[ 'response' => 403 ]
 			);
 		}
 
 		if ( self::user_has_excluded_roles( $user_id ) ) {
 			wp_die(
-				esc_html__( 'Your role is excluded from fast login, please contact your website administrator.', 'z-user-onetime-login' ),
-				esc_html__( 'Login error', 'z-user-onetime-login' ),
+				esc_html__( 'Your role is excluded from fast login, please contact your website administrator.', 'z-onetime-login-link' ),
+				esc_html__( 'Login error', 'z-onetime-login-link' ),
 				[ 'response' => 403 ]
 			);
 		}
@@ -187,8 +188,8 @@ class Z_User_Onetime_Login {
 
 		if ( empty( $expires ) || time() > $expires ) {
 			wp_die(
-				esc_html__( 'Your login token has expired.', 'z-user-onetime-login' ),
-				esc_html__( 'Login error', 'z-user-onetime-login' ),
+				esc_html__( 'Your login token has expired.', 'z-onetime-login-link' ),
+				esc_html__( 'Login error', 'z-onetime-login-link' ),
 				[ 'response' => 403 ]
 			);
 		}
@@ -197,8 +198,8 @@ class Z_User_Onetime_Login {
 		$stored_hash = get_user_meta( $user_id, 'z_login_once_token', true );
 		if ( empty( $stored_hash ) || ! hash_equals( $stored_hash, hash( 'sha256', $token ) ) ) {
 			wp_die(
-				esc_html__( 'This login link is invalid or ahs already been used.', 'z-user-onetime-login' ),
-				esc_html__( 'Login error', 'z-user-onetime-login' ),
+				esc_html__( 'This login link is invalid or ahs already been used.', 'z-onetime-login-link' ),
+				esc_html__( 'Login error', 'z-onetime-login-link' ),
 				[ 'response' => 403 ]
 			);
 		}
@@ -209,8 +210,8 @@ class Z_User_Onetime_Login {
 			$fingerprint = get_user_meta( $user_id, 'z_login_once_fingerprint', true );
 			if ( $fingerprint !== hash( 'sha256', sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) . sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) ) ) {
 				wp_die(
-					esc_html__( 'Login link environment mismatch. Use the same browser/platform for both requesting and using the link.', 'z-user-onetime-login' ),
-					esc_html__( 'Login error', 'z-user-onetime-login' ),
+					esc_html__( 'Login link environment mismatch. Use the same browser/platform for both requesting and using the link.', 'z-onetime-login-link' ),
+					esc_html__( 'Login error', 'z-onetime-login-link' ),
 					[ 'response' => 403 ]
 				);
 			}
@@ -299,7 +300,7 @@ class Z_User_Onetime_Login {
 		);
 
 		$actions['zloginonce'] =
-			'<a href="'.esc_url($url).'">'.__('Send login once link','z-user-onetime-login').'</a>';
+			'<a href="'.esc_url($url).'">'.__('Send login once link','z-onetime-login-link').'</a>';
 
 		return $actions;
 
@@ -356,7 +357,7 @@ class Z_User_Onetime_Login {
 		);
 
 
-		$options = get_option( 'z_user_onetime_login_plugin_options' );
+		$options = get_option( 'z_onetime_login_link_plugin_options' );
 
 		$subject = $options['mail_subject'];
 		$linktext = $options['mail_linktext'] ?: $link_url;
@@ -385,7 +386,7 @@ class Z_User_Onetime_Login {
 
     public function add_request_link_after_login_nav() {
 
-		$options = get_option( 'z_user_onetime_login_plugin_options' );
+		$options = get_option( 'z_onetime_login_link_plugin_options' );
 		if ( empty( $options['allow_user_request'] ) ) {
 			return;
 		}
@@ -399,7 +400,7 @@ class Z_User_Onetime_Login {
             	var p = document.createElement('p');
             	p.id = 'zloginonce-request-link';
             	p.innerHTML = '<a href="<?php echo esc_url( $url ); ?>"><?php
-					esc_html_e( 'Request a one-time login link', 'z-user-onetime-login' );
+					esc_html_e( 'Request a one-time login link', 'z-onetime-login-link' );
 				?></a>';
             	nav.insertAdjacentElement('afterend', p);
         	}
@@ -410,7 +411,7 @@ class Z_User_Onetime_Login {
 
     protected function is_rate_limited( $email ) {
 
-		$options = get_option( 'z_user_onetime_login_plugin_options' );
+		$options = get_option( 'z_onetime_login_link_plugin_options' );
 
 		if ( empty( $options['use_rate_limit'] ) ) {
 			return false;
@@ -437,15 +438,15 @@ class Z_User_Onetime_Login {
 		}
 
 		login_header(
-			__( 'Email login link', 'z-user-onetime-login' ),
-			'<p class="message">' . __( 'Enter your email address to receive a one-time login link.', 'z-user-onetime-login' ) . '</p>'
+			__( 'Email login link', 'z-onetime-login-link' ),
+			'<p class="message">' . __( 'Enter your email address to receive a one-time login link.', 'z-onetime-login-link' ) . '</p>'
 		);
 		?>
 
 		<form method="post" action="<?php echo esc_url( wp_login_url() . '?action=zloginonce' ); ?>">
 			<p>
 				<label for="zloginonce_email">
-					<?php esc_html_e( 'Email address', 'z-user-onetime-login' ); ?>
+					<?php esc_html_e( 'Email address', 'z-onetime-login-link' ); ?>
 				</label>
 				<input type="email" name="zloginonce_email" id="zloginonce_email" class="input" required>
 			</p>
@@ -453,13 +454,13 @@ class Z_User_Onetime_Login {
 			<?php wp_nonce_field( 'zloginonce_request', 'zloginonce_nonce' ); ?>
 
 			<p class="submit">
-				<input type="submit" class="button button-primary" value="<?php esc_attr_e( 'Send login link', 'z-user-onetime-login' ); ?>">
+				<input type="submit" class="button button-primary" value="<?php esc_attr_e( 'Send login link', 'z-onetime-login-link' ); ?>">
 			</p>
 		</form>
 
 		<p id="nav">
 			<a href="<?php echo esc_url( wp_login_url() ); ?>">
-				<?php esc_html_e( '← Back to login', 'z-user-onetime-login' ); ?>
+				<?php esc_html_e( '← Back to login', 'z-onetime-login-link' ); ?>
 			</a>
 		</p>
 
@@ -518,7 +519,7 @@ class Z_User_Onetime_Login {
 		);
 
 		// Mail
-		$options = get_option( 'z_user_onetime_login_plugin_options' );
+		$options = get_option( 'z_onetime_login_link_plugin_options' );
 
 		$subject = $options['mail_subject'];
 		$content = str_replace(

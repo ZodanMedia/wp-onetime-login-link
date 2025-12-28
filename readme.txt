@@ -1,8 +1,8 @@
-=== Z User Onetime Login ===
+=== Z One-time Login Link ===
 Contributors: martenmoolenaar, zodannl
-Plugin URI: https://plugins.zodan.nl/wordpress-user-onetime-login/
+Plugin URI: https://plugins.zodan.nl/wordpress-onetime-login-link/
 Donate link: https://www.buymeacoffee.com/zodan
-Tags: user, login, direct login, theme development, development
+Tags: direct login, fast login, no password, theme development, development
 Requires at least: 5.5
 Tested up to: 6.9
 Description: Let users login once without a password
@@ -10,24 +10,30 @@ Version: 0.0.3
 Stable tag: 0.0.3
 Author: Zodan
 Author URI: https://zodan.nl
-Text Domain: z-user-onetime-login
+Text Domain: z-onetime-login-link
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
 Allow users to login once without a password.
 
+
 == Description ==
 
-When we are developing themes, we quite often like to switch between the old (active) and the new (to develop) version of a theme. Sometimes without other people noticing.
-This plugin does exactly that.
+In projects, we often encounter (groups of) users struggling with the sheer number of passwords they have to manage. Naturally, we support good password management - combined with other, additional security layers. However, we'd like to accommodate this group.
+
+This plugin allows you to log in *securely* without a password.
 
 
 = What does it do? =
 
-It lets users with certain roles see another (than the currently active) theme, by 
-* Selecting a theme from the list of installed themes
-* Selecting which user roles are permitted to switch themes and
-* Optionally, selecting user roles that can use a 'switch theme/back' button on the front-end
+* In the user list, the plugin creates a ‘Send login once link’ for each user.
+* The link creates a personal key linked to the user that can be used to log in temporarily (maximum 15 minutes).
+* The link will be sent to the user via email.
+
+Furthermore, the website administrator can customize the settings for
+* The link expiration time
+* Whether or not users can request a link themselves and if,
+* If rate limiting is needed (e.g. no more than once every 5 minutes)
 
 This plugin is under active development. Any feature requests are welcome at [plugins@zodan.nl](plugins@zodan.nl)!
 
@@ -49,15 +55,14 @@ This plugin is under active development. Any feature requests are welcome at [pl
 3. Activate the plugin through the ‘Plugins’ menu in WordPress;
 4. Go to ‘after activation’ below.
 
-
 = After activation =
 
 1. On the Plugins page in WordPress you will see a 'settings' link below the plugin name;
 2. On the One-time Login Link settings page:
 **  Select which user roles to exclude
-**  Set the mail settings
+**  Set the mail settings for the mail with the link users receive
+**  Optionally, take a look at the other settings
 3. Save your settings and you’re done!
-
 
 
 == Frequently asked questions ==
@@ -73,22 +78,22 @@ Yep. It does.
 = Do you have plans to improve the plugin? =
 
 We currently have on our roadmap:
+* Adding bulk actions, in order to send (a selection of) users their One-time Login Link in one fell swoop.
 * Adding translations
-* Addin
+
 * Set the preference per user
 
 If you have a feature suggestion, send us an email at [plugins@zodan.nl](plugins@zodan.nl).
 
 
 
-
 == Changelog ==
 
 = 0.0.3 =
-* Added settings for custom expiration
+* Added settings for customization of link expiration time and rate limiting.
 
 = 0.0.2 =
-* Added possibility to request a login link (on the login screen)
+* Added possibility to request a login link (on the login screen).
 
 = 0.0.1 =
-* Very first version of this plugin
+* Very first version of this plugin.

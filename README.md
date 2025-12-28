@@ -1,4 +1,4 @@
-# Z User One-time Login Link
+# Z One-time Login Link
 > Allow users to login once without a password
 
 
