@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: Z Onetime Login Link
+ * Plugin Name: Z One-time Login Link
  * Contributors: martenmoolenaar, zodannl
  * Plugin URI: https://plugins.zodan.nl/wordpress-onetime-login-link/
  * Tags: direct login, fast login, no password, theme development, development
