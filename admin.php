@@ -101,6 +101,15 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
 			'z_user_onetime_login_plugin'
 		);
 
+        // Field: Expiration time
+		add_settings_field(
+			'z_user_onetime_login_user_token_expire_time',
+			esc_html__('Expiration time', 'z-user-onetime-login'), 
+			'z_user_onetime_login_render_token_expire_time',
+			'z_user_onetime_login_plugin',
+			'z_user_onetime_login_other_options_section'
+		);
+
         // Field: Allow user request
 		add_settings_field(
 			'z_user_onetime_login_user_request',
@@ -110,26 +119,26 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
 			'z_user_onetime_login_other_options_section'
 		);
 
-        // Field: Expire time
+        // Field: Use rate limiting
 		add_settings_field(
-			'z_user_onetime_login_user_token_expire_time',
-			esc_html__('Expire time', 'z-user-onetime-login'), 
-			'z_user_onetime_login_render_token_expire_time',
+			'z_user_onetime_login_user_request_rate_limit',
+			esc_html__('Use rate limiting', 'z-user-onetime-login'), 
+			'z_user_onetime_login_render_rate_limit_checkbox',
 			'z_user_onetime_login_plugin',
 			'z_user_onetime_login_other_options_section'
 		);
 
         // Field: Use rate limiting
 		add_settings_field(
-			'z_user_onetime_login_user_request_rate_limit',
+			'z_user_onetime_login_user_request_rate_limit_value',
 			esc_html__('Rate limit', 'z-user-onetime-login'), 
-			'z_user_onetime_login_render_rate_limit_checkbox',
+			'z_user_onetime_login_render_rate_limit_value',
 			'z_user_onetime_login_plugin',
 			'z_user_onetime_login_other_options_section'
 		);
     }
 
-    add_action( 'admin_init', 'z_user_onetime_login_register_settings' );
+    add_action( 'admin_init', 'z_user_onetime_login_register_settings' );   
 
 
 
@@ -137,27 +146,19 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
         echo '<p>' . esc_html__('With the One-time Login Link you can give users the option to log into Wordpress without a password.', 'z-user-onetime-login') . '</p>';
        
         echo '<p>&nbsp;</p>';
-    }
+    }   
 
-
-    function z_user_onetime_login_roles_section_text_depricated() { 
-        echo '<table class="form-table" role="presentation"><tbody><tr><th scope="row">';
-        echo '<span class="z-warning">' . esc_html__('Please note', 'z-user-onetime-login') . '</span>';
-        echo '</th><td>';
-        echo esc_html__("While we've prioritized security in developing this plugin, we still recommend against using direct login for certain roles.", 'z-user-onetime-login');
-        echo '<br>';
-        echo esc_html__('Be wise and exclude roles like Administrators, Editors, Shop managers.', 'z-user-onetime-login');
-        echo '</td></tr></tbody></table>';
-    }
 
 
     function z_user_onetime_login_roles_section_text() { 
-        echo '<p><strong class="z-warning">' . esc_html__('Please note', 'z-user-onetime-login') . '</strong> ';
+        echo '<p><strong class="z-warning zotll-warning">' . esc_html__('Please note', 'z-user-onetime-login') . '</strong> ';
         echo esc_html__("While we've prioritized security in developing this plugin, we still recommend against using direct login for certain roles", 'z-user-onetime-login');
         echo '<br>';
         echo esc_html__('Be wise and exclude roles like Administrators, Editors, Shop managers.', 'z-user-onetime-login');
         echo '</p>';
-    }
+    }   
+
+
 
     function z_user_onetime_login_render_roles_checkboxes() {
         global $wp_roles;
@@ -173,9 +174,13 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
                 esc_html( $role_details['name'] )
             );
         }
-    }
+    }   
 
-    function z_user_onetime_login_mail_section_text() {}
+
+
+    function z_user_onetime_login_mail_section_text() {}   
+
+
 
     function z_user_onetime_login_render_mail_linktext() {
         $options = get_option( 'z_user_onetime_login_plugin_options' );
@@ -188,7 +193,9 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
             esc_html(__('resulting in something like', 'z-user-onetime-login')),
             esc_html(__('If you leave this blank, the link text will display the URL', 'z-user-onetime-login')),
         );
-    }
+    }   
+
+
 
     function z_user_onetime_login_render_mail_subject() {
         $options = get_option( 'z_user_onetime_login_plugin_options' );
@@ -199,7 +206,8 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
             esc_html(__('Subject', 'z-user-onetime-login')),
             esc_html( $mail_subject)
         );
-    }
+    }   
+
 
 
     function z_user_onetime_login_render_mail_content() {
@@ -225,10 +233,13 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
         echo esc_html(__("You can also include the {{displayname}} and {{firstname}} codes for the user's display name and first name respectively.", 'z-user-onetime-login')).'</p>';
         wp_editor( $mail_content, $id, $settings );
 
-    }
+    }   
 
 
-    function z_user_onetime_login_other_options_section_text() {}
+
+    function z_user_onetime_login_other_options_section_text() {}   
+
+
 
     function z_user_onetime_login_render_user_request_checkbox() {
         $options = get_option( 'z_user_onetime_login_plugin_options' );
@@ -236,9 +247,11 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
         printf(
             '<label><input type="checkbox" name="z_user_onetime_login_plugin_options[allow_user_request]" value="1" %s> %s</label><br>',
             checked( $allow_user_request, true, false ),
-            esc_html( __('Allow users to request a new One-time Login Link, the way they reset a password', 'z-user-onetime-login') )
+            esc_html( __('Allow users to request a new One-time Login Link on the login form, similar to how reset a password.', 'z-user-onetime-login') )
         );
-    }
+    }   
+
+
 
     function z_user_onetime_login_render_token_expire_time() {
         $options = get_option( 'z_user_onetime_login_plugin_options' );
@@ -250,10 +263,7 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
             esc_html( $expire_time),
             esc_html(__('seconds', 'z-user-onetime-login')),
         );
-    }
-
-
-    
+    }   
 
 
 
@@ -261,11 +271,25 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
         $options = get_option( 'z_user_onetime_login_plugin_options' );
         $use_rate_limit = isset( $options['use_rate_limit'] ) ? $options['use_rate_limit'] : false;
         printf(
-            '<label><input type="checkbox" name="z_user_onetime_login_plugin_options[use_rate_limit]" value="1" %s> %s</label><br>',
+            '<label><input type="checkbox" id="z_use_rate_limit" name="z_user_onetime_login_plugin_options[use_rate_limit]" value="1" %s> %s</label><br>',
             checked( $use_rate_limit, true, false ),
             esc_html( __('Use rate limiting to the user requests (max. once every 10 minutes)', 'z-user-onetime-login') )
         );
-    }
+    }   
+
+
+
+    function z_user_onetime_login_render_rate_limit_value() {
+        $options = get_option( 'z_user_onetime_login_plugin_options' );
+
+        $rate_limit_value = isset( $options['rate_limit_value'] ) ? $options['rate_limit_value'] : intval(MINUTE_IN_SECONDS * 10);
+
+        printf('<label><strong class="screen-reader-text">%s:</strong> <input type="number" id="z_rate_limit_value" name="z_user_onetime_login_plugin_options[rate_limit_value]" value="%s" min="60"> %s</label>',
+            esc_html(__('Subject', 'z-user-onetime-login')),
+            esc_html( $rate_limit_value),
+            esc_html(__('seconds between requests', 'z-user-onetime-login')),
+        );
+    }   
 
 
 
@@ -302,6 +326,16 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
             $output['expire_time'] = $expire_time;
         }
 
+        if ( isset( $input['rate_limit_value'] ) ) {
+            $expire_time = intval($input['rate_limit_value']);
+            if( empty($rate_limit_value) ) {
+                $rate_limit_value = MINUTE_IN_SECONDS * 10;
+            } elseif ( $rate_limit_value < 60 ) { // set minimum to 1 minute
+                $rate_limit_value = 300;
+            }
+            $output['rate_limit_value'] = $rate_limit_value;
+        }
+
         if ( isset( $input['roles'] ) && is_array( $input['roles'] ) ) {
             global $wp_roles;
             $all_roles = array_keys( $wp_roles->roles );
@@ -310,7 +344,7 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
         }
 
         return $output;
-    }
+    }   
 
 
 
@@ -323,7 +357,7 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
             'z_user_onetime_login_options_page'
         );
     }
-    add_action( 'admin_menu', 'z_user_onetime_login_add_admin_menu' );
+    add_action( 'admin_menu', 'z_user_onetime_login_add_admin_menu' );   
 
 
 
@@ -366,7 +400,7 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
             );
             wp_enqueue_script( 'z-user-onetime-login-admin-scripts' );
         }
-    }
+    }   
 
 
 

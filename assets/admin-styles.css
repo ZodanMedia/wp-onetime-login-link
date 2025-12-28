@@ -8,6 +8,11 @@
 :root {
     --z-padding-left: 6px;
     --z-padding-right: 6px;
+    --zmam-color-red: #f00;
+    --zmam-color-bg-warning: #666;
+    --zmam-color-text-warning: #fff;
+    --zmam-color-bg-panel: #fff;
+    --zmam-color-text-panel: #fff;
 }
 #adminmenu a[href*="?page=z_user_onetime_login"]:before {
     display: inline-block;
@@ -44,14 +49,21 @@
 #zlinktext-example-frame.show {
 	display: inline-block;
 }
-
+.z-warning {
+    background: var(--zmam-color-bg-warning);
+    color: var(--zmam-color-text-warning);
+    padding: 0.25rem 1rem;
+    border-radius: 0.4rem;
+}
+.z-warning.zotll-warning {
+    padding: 0.15rem 0.75rem;  
+}
 .zThanks {
     position: absolute;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     align-items: center;
-
 }
 .zThanks a {
     text-decoration: none;

@@ -41,16 +41,22 @@ class Z_User_Onetime_Login {
 	public $plugin_url = '';
 	public $plugin_path = '';
 	public $expire_time = HOUR_IN_SECONDS; 
-	public $rate_limit = MINUTE_IN_SECONDS * 10; // wait 10 min
+	public $rate_limit_value = MINUTE_IN_SECONDS * 10; // wait 10 min   
 
-	public static function get_instance() {
+
+
+    public static function get_instance() {
 		NULL === self::$instance and self::$instance = new self;
 		return self::$instance;
-	}
+	}   
 
-	public function __construct() {}
 
-	public function plugin_setup() {
+
+    public function __construct() {}   
+
+
+
+    public function plugin_setup() {
 
 		if ( ! defined( 'Z_USER_ONETIME_LOGIN_VERSION' ) ) {
 			define( 'Z_USER_ONETIME_LOGIN_VERSION', $this->plugin_version  );
@@ -63,12 +69,14 @@ class Z_User_Onetime_Login {
 		if ( ! empty( $options['expire_time'] ) ) {
 			$this->expire_time = intval( $options['expire_time'] );
 		}
-
-
+		if ( ! empty( $options['rate_limit_value'] ) ) {
+			$this->rate_limit_value = intval( $options['rate_limit_value'] );
+		}
 
 		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), [ $this, 'add_plugin_settings_link' ] );
 
-		add_filter( 'login_message', [ $this, 'add_request_link_to_login' ] );
+		add_action('login_enqueue_scripts', [ $this, 'add_request_link_after_login_nav' ] );
+
 		add_action( 'login_form_zloginonce', [ $this, 'render_zloginonce_form' ] );	
 
 		add_action( 'init', [ $this, 'handle_self_login_request' ] );
@@ -89,18 +97,11 @@ class Z_User_Onetime_Login {
 		if ( ! is_admin() && ! is_user_logged_in() ) {
 			add_action( 'init', [ $this, 'handle_login_from_url' ] );
 		}
-	}
+	}   
 
 
 
-
-
-
-
-
-
-
-	public static function user_has_excluded_roles( $user_id ) {
+    public static function user_has_excluded_roles( $user_id ) {
 
 		$options = get_option( 'z_user_onetime_login_plugin_options' );
 		$roles = $options['roles'];
@@ -109,17 +110,19 @@ class Z_User_Onetime_Login {
 		$user = get_user_by('id', intval( $user_id ) );
 		
 		return ! empty( array_intersect( $roles, (array) $user->roles ) );
-	}
+	}   
 
 
-	public static function add_plugin_settings_link( $links ) {
+
+    public static function add_plugin_settings_link( $links ) {
 		$settings_link = '<a href="options-general.php?page=z_user_onetime_login">' . __( 'Settings','z-user-onetime-login' ) . '</a>';
 		array_unshift( $links, $settings_link );
 		return $links;
-	}
+	}   
 
 
-	public function handle_login_from_url() {
+
+    public function handle_login_from_url() {
 
 		// Already logged in? Bail out.
 		if ( is_user_logged_in() ) {
@@ -273,10 +276,11 @@ class Z_User_Onetime_Login {
 			is_multisite() ? network_home_url() : home_url()
 		);
 		exit;
-	}
+	}   
 
 
-	public function add_send_zloginonce_link_mail( $actions, $user ) {
+
+    public function add_send_zloginonce_link_mail( $actions, $user ) {
 
 		if ( self::user_has_excluded_roles( $user->ID ) ) {
 			return $actions;
@@ -299,10 +303,11 @@ class Z_User_Onetime_Login {
 
 		return $actions;
 
-	}
+	}   
 
 
-	public function handle_send_login_once_mail() {
+
+    public function handle_send_login_once_mail() {
 
 		if (
 			empty($_GET['action']) ||
@@ -374,32 +379,36 @@ class Z_User_Onetime_Login {
 		$redirect_url = admin_url( 'users.php?zloginonce_sent' );
 		wp_safe_redirect($redirect_url);
 		exit;
-	}
+	}   
 
 
-	public function add_request_link_to_login( $message ) {
+
+    public function add_request_link_after_login_nav() {
 
 		$options = get_option( 'z_user_onetime_login_plugin_options' );
-
 		if ( empty( $options['allow_user_request'] ) ) {
-			return $message;
+			return;
 		}
-
-		// $url = wp_lostpassword_url() . '&zloginonce=1';
+				
 		$url = wp_login_url() . '?action=zloginonce';
 
-		$message .= '<p class="message zloginonce-link">
-			<a href="' . esc_url( $url ) . '">' .
-			esc_html__( 'Request a one-time login link', 'z-user-onetime-login' ) .
-			'</a>
-		</p>';
+		?><script>
+		document.addEventListener('DOMContentLoaded', function () {
+        	var nav = document.getElementById('nav');
+        	if (nav) {
+            	var p = document.createElement('p');
+            	p.id = 'zloginonce-request-link';
+            	p.innerHTML = '<a href="<?php echo esc_url( $url ); ?>"><?php
+					esc_html_e( 'Request a one-time login link', 'z-user-onetime-login' );
+				?></a>';
+            	nav.insertAdjacentElement('afterend', p);
+        	}
+    	});</script><style>#zloginonce-request-link{font-size:13px;margin-top: 10px;}</style><?php
+	}   
 
-		return $message;
-	}
 
 
-
-	protected function is_rate_limited( $email ) {
+    protected function is_rate_limited( $email ) {
 
 		$options = get_option( 'z_user_onetime_login_plugin_options' );
 
@@ -414,12 +423,13 @@ class Z_User_Onetime_Login {
 			return true;
 		}
 
-		set_transient( $key, 1, $this->rate_limit );
+		set_transient( $key, 1, $this->rate_limit_value );
 		return false;
-	}
+	}   
 
 
-	public function render_zloginonce_form() {
+
+    public function render_zloginonce_form() {
 
 		if ( is_user_logged_in() ) {
 			wp_safe_redirect( admin_url() );
@@ -456,10 +466,11 @@ class Z_User_Onetime_Login {
 		<?php
 		login_footer();
 		exit;
-	}
+	}   
 
 
-	public function handle_self_login_request() {
+
+    public function handle_self_login_request() {
 
 		if ( empty($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'POST' || empty( $_POST['zloginonce_email'] ) || empty( $_POST['zloginonce_nonce'] ) ) {
 			return;
