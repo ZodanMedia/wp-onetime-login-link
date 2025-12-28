@@ -63,13 +63,11 @@ class Z_User_Onetime_Login {
 
 		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), [ $this, 'add_plugin_settings_link' ] );
 
-		add_filter( 'login_message', [ $this, 'add_login_request_link' ] );
-		add_action( 'login_init', [ $this, 'redirect_from_password_flow' ] );
-		
-		add_shortcode( 'zloginonce_request_form', [ $this, 'loginonce_request_form_shortcode' ] );
+		add_filter( 'login_message', [ $this, 'add_request_link_to_login' ] );
+		add_action( 'login_form_zloginonce', [ $this, 'render_zloginonce_form' ] );	
 
-		// add_action( 'admin_post_nopriv_zloginonce_request',  [ Z_User_Onetime_Login::get_instance(), 'handle_self_login_request' ]);
-		add_action( 'admin_post_nopriv_zloginonce_request',  [ $this, 'handle_self_login_request' ]);
+		add_action( 'init', [ $this, 'handle_self_login_request' ] );
+
 
 		if ( is_admin() ) {
 			add_action( 'admin_init', [ $this, 'handle_send_login_once_mail' ] );
@@ -87,6 +85,14 @@ class Z_User_Onetime_Login {
 			add_action( 'init', [ $this, 'handle_login_from_url' ] );
 		}
 	}
+
+
+
+
+
+
+
+
 
 
 	public static function user_has_excluded_roles( $user_id ) {
@@ -110,57 +116,97 @@ class Z_User_Onetime_Login {
 
 	public function handle_login_from_url() {
 
-		// No login parameter → bail out
-		if ( empty( $_GET['zloginonce'] ) ) {
-			return;
-		}
 		// Already logged in? Bail out.
 		if ( is_user_logged_in() ) {
 			return;
 		}
 
-    	$nonce = sanitize_text_field( wp_unslash( $_GET['zloginonce'] ) );
-		// Bail out if the nonce is not ok
-		if ( empty( $nonce ) ) {
+		/**
+ 		 * Login token from email link.
+ 		 * This is NOT a WordPress nonce but a cryptographically secure, single-use token.
+		 * 
+		 * No login parameter present or an empty token → bail out
+		 */
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( empty( $_GET['zloginonce'] ) ) { 
+			return;
+		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+    	$token = sanitize_text_field( wp_unslash( $_GET['zloginonce'] ) );
+		if ( empty( $token ) ) {
 			return;
 		}
 
+		
 		// Find user by nonce (one-time mapping)
 		$users = get_users(
 			array(
 				'fields'     => array( 'ID' ),
 				'meta_key' => 'z_login_once_nonce', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key  -- This is a one-time operation, and there is no more appropriate functionality available
-				'meta_value' => $nonce, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value  -- This is a one-time operation, and there is no more appropriate functionality available
+				'meta_value' => $token, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value  -- This is a one-time operation, and there is no more appropriate functionality available
 				'number'     => 1,
 			)
 		);
 
 		if ( empty( $users ) ) {
-			return;
+			wp_die(
+				esc_html__( 'Invalid or expired login link.', 'z-user-onetime-login' ),
+				esc_html__( 'Login error', 'z-user-onetime-login' ),
+				[ 'response' => 403 ]
+			);
 		}
 
 		$user_id = (int) $users[0]->ID;
 		$user    = get_user_by( 'id', $user_id );
 
 		if ( ! $user ) {
-			return;
+			wp_die(
+				esc_html__( 'Invalid user.', 'z-user-onetime-login' ),
+				esc_html__( 'Login error', 'z-user-onetime-login' ),
+				[ 'response' => 403 ]
+			);
 		}
 
 		if ( self::user_has_excluded_roles( $user_id ) ) {
-			return;
+			wp_die(
+				esc_html__( 'Your role is excluded from fast login, please contact your website administrator.', 'z-user-onetime-login' ),
+				esc_html__( 'Login error', 'z-user-onetime-login' ),
+				[ 'response' => 403 ]
+			);
 		}
 
 		$expires = (int) get_user_meta( $user_id, 'z_login_once_expires', true );
 
 		if ( empty( $expires ) || time() > $expires ) {
-			return;
+			wp_die(
+				esc_html__( 'Your login token has expired.', 'z-user-onetime-login' ),
+				esc_html__( 'Login error', 'z-user-onetime-login' ),
+				[ 'response' => 403 ]
+			);
 		}
 
-		// Verify WP nonce 
-		if ( ! wp_verify_nonce( $nonce, 'z_login_once' ) ) {
-			return;
+		// Verify token
+		$stored_hash = get_user_meta( $user_id, 'z_login_once_token', true );
+		if ( empty( $stored_hash ) || ! hash_equals( $stored_hash, hash( 'sha256', $token ) ) ) {
+			wp_die(
+				esc_html__( 'This login link is invalid or ahs already been used.', 'z-user-onetime-login' ),
+				esc_html__( 'Login error', 'z-user-onetime-login' ),
+				[ 'response' => 403 ]
+			);
 		}
+		
 
+		if( ! empty( $_SERVER['REMOTE_ADDR'] ) && ! empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
+			// use fingerprinting
+			$fingerprint = get_user_meta( $user_id, 'z_login_once_fingerprint', true );
+			if ( $fingerprint !== hash( 'sha256', sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) . sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) ) ) {
+				wp_die(
+					esc_html__( 'Login link environment mismatch. Use the same browser/platform for both requesting and using the link.', 'z-user-onetime-login' ),
+					esc_html__( 'Login error', 'z-user-onetime-login' ),
+					[ 'response' => 403 ]
+				);
+			}
+		}
 
 
 		/**
@@ -168,11 +214,19 @@ class Z_User_Onetime_Login {
 		 * 🌐 MULTISITE: switch after validation
 		 * =====================================================
 		 */
-		if ( is_multisite() ) {
-			$primary_blog = (int) get_user_meta( $user_id, 'primary_blog', true );
+		$switched = false;
 
-			if ( $primary_blog ) {
-				switch_to_blog( $primary_blog );
+		if ( is_multisite() && ! is_network_admin() ) {
+
+			$blogs = get_blogs_of_user( $user_id );
+
+			if ( ! empty( $blogs ) ) {
+				$blog_ids = array_keys( $blogs );
+
+				if ( ! in_array( get_current_blog_id(), $blog_ids, true ) ) {
+					switch_to_blog( (int) $blog_ids[0] );
+					$switched = true;
+				}
 			}
 		}
 
@@ -184,7 +238,6 @@ class Z_User_Onetime_Login {
 		 */
 
 		// Set WP authorisation cookie
-		// wp_set_auth_cookie( $user_id, true );
 		wp_set_auth_cookie( $user_id, true, is_multisite() );
 
 		// if you want is_user_logged_in to work you should set `wp_set_current_user` explicityly
@@ -195,10 +248,10 @@ class Z_User_Onetime_Login {
 
 		/**
 		 * =====================================================
-		 * 🔄 Renew the nonce → link is now invalid
+		 * 🔄 Delete the token → link is now invalid
 		 * =====================================================
 		 */
-		update_user_meta( $user_id, 'z_login_once_nonce', wp_create_nonce( 'z_login_once' ) );
+		delete_user_meta( $user_id, 'z_login_once_token' );
 		delete_user_meta( $user_id, 'z_login_once_expires' );
 
 
@@ -207,7 +260,7 @@ class Z_User_Onetime_Login {
 		 * 🌐 MULTISITE: restore context
 		 * =====================================================
 		 */
-		if ( is_multisite() ) {
+		if ( $switched ) {
 			restore_current_blog();
 		}
 
@@ -269,15 +322,27 @@ class Z_User_Onetime_Login {
 			return;
 		}
 
-		$nonce = wp_create_nonce( 'z_login_once' );
-		update_user_meta( $user->ID, 'z_login_once_nonce', $nonce );
+		// Create login token for the user (and first delete the old ones, if any)
+		delete_user_meta( $user->ID, 'z_login_once_token' );
+		delete_user_meta( $user->ID, 'z_login_once_expires' );
+
+		$token = bin2hex( random_bytes( 32 ) ); // 64 chars
+		$hash  = hash( 'sha256', $token );
+		update_user_meta( $user->ID, 'z_login_once_token', $hash );
 		update_user_meta( $user->ID, 'z_login_once_expires', time() + HOUR_IN_SECONDS );
+		if( ! empty( $_SERVER['REMOTE_ADDR'] ) && ! empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
+			// use fingerprinting
+			update_user_meta(
+				$user->ID,
+				'z_login_once_fingerprint',
+				hash( 'sha256', sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) . sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) )
+			);
+		}
 
-
-		// $link_url = add_query_arg( ['zloginonce' => $nonce], home_url() );
+		// The login link
 		$link_url = add_query_arg(
-    		[ 'zloginonce' => $nonce ],
-    		is_multisite() ? network_home_url() : home_url()
+			[ 'zloginonce' => $token ],
+			is_multisite() ? network_home_url() : home_url()
 		);
 
 
@@ -307,7 +372,7 @@ class Z_User_Onetime_Login {
 	}
 
 
-	public function add_login_request_link ( $message ) {
+	public function add_request_link_to_login( $message ) {
 
 		$options = get_option( 'z_user_onetime_login_plugin_options' );
 
@@ -315,11 +380,12 @@ class Z_User_Onetime_Login {
 			return $message;
 		}
 
-		$url = wp_lostpassword_url() . '&zloginonce=1';
+		// $url = wp_lostpassword_url() . '&zloginonce=1';
+		$url = wp_login_url() . '?action=zloginonce';
 
 		$message .= '<p class="message zloginonce-link">
 			<a href="' . esc_url( $url ) . '">' .
-			esc_html__( 'Loginlink aanvragen', 'z-user-onetime-login' ) .
+			esc_html__( 'Request a one-time login link', 'z-user-onetime-login' ) .
 			'</a>
 		</p>';
 
@@ -327,15 +393,14 @@ class Z_User_Onetime_Login {
 	}
 
 
-	public function redirect_from_password_flow() {
-		if ( isset( $_GET['zloginonce'] ) ) {
-			wp_safe_redirect( site_url( '/onetime-login/' ) );
-			exit;
-		}
-	}
-
 
 	protected function is_rate_limited( $email ) {
+
+		$options = get_option( 'z_user_onetime_login_plugin_options' );
+
+		if ( empty( $options['use_rate_limit'] ) ) {
+			return false;
+		}
 
 		$ip   = ! empty($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) : '';
 		$key  = 'zloginonce_rl_' . md5( $ip . $email );
@@ -349,51 +414,54 @@ class Z_User_Onetime_Login {
 	}
 
 
-	public function loginonce_request_form_shortcode() {
+	public function render_zloginonce_form() {
 
 		if ( is_user_logged_in() ) {
-			return '<p>' . __( 'Je bent al ingelogd.', 'z-user-onetime-login' ) . '</p>';
+			wp_safe_redirect( admin_url() );
+			exit;
 		}
 
-   		ob_start();
-   		?>
-			<form method="post">
-				<p>
-					<label for="zloginonce_email">
-						<?php esc_html_e( 'Email address', 'z-user-onetime-login' ); ?>
-					</label>
-					<input type="email" name="zloginonce_email" required>
-				</p>
+		login_header(
+			__( 'Email login link', 'z-user-onetime-login' ),
+			'<p class="message">' . __( 'Enter your email address to receive a one-time login link.', 'z-user-onetime-login' ) . '</p>'
+		);
+		?>
 
-				<?php wp_nonce_field( 'zloginonce_request', 'zloginonce_nonce' ); ?>
+		<form method="post" action="<?php echo esc_url( wp_login_url() . '?action=zloginonce' ); ?>">
+			<p>
+				<label for="zloginonce_email">
+					<?php esc_html_e( 'Email address', 'z-user-onetime-login' ); ?>
+				</label>
+				<input type="email" name="zloginonce_email" id="zloginonce_email" class="input" required>
+			</p>
 
-				<input type="hidden" name="action" value="zloginonce_request">
+			<?php wp_nonce_field( 'zloginonce_request', 'zloginonce_nonce' ); ?>
 
-				<p>
-					<button type="submit">
-						<?php esc_html_e( 'Send me a login link', 'z-user-onetime-login' ); ?>
-					</button>
-				</p>
-			</form>
+			<p class="submit">
+				<input type="submit" class="button button-primary" value="<?php esc_attr_e( 'Send login link', 'z-user-onetime-login' ); ?>">
+			</p>
+		</form>
+
+		<p id="nav">
+			<a href="<?php echo esc_url( wp_login_url() ); ?>">
+				<?php esc_html_e( '← Back to login', 'z-user-onetime-login' ); ?>
+			</a>
+		</p>
+
 		<?php
-		
-		return ob_get_clean();
+		login_footer();
+		exit;
 	}
 
 
 	public function handle_self_login_request() {
 
-		if (
-			empty( $_POST['zloginonce_email'] ) ||
-			empty( $_POST['zloginonce_nonce'] )
-		) {
-			wp_safe_redirect( wp_get_referer() );
-			exit;
+		if ( empty($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'POST' || empty( $_POST['zloginonce_email'] ) || empty( $_POST['zloginonce_nonce'] ) ) {
+			return;
 		}
 
 		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['zloginonce_nonce'] ) ), 'zloginonce_request' ) ) {
-			wp_safe_redirect( wp_get_referer() );
-			exit;
+			wp_die( 'Nonce not verified' );
 		}
 
 		$email = sanitize_email( wp_unslash( $_POST['zloginonce_email'] ) );
@@ -404,22 +472,36 @@ class Z_User_Onetime_Login {
     		exit;
 		}
 
-		// Altijd generiek antwoord → geen user enumeration
+		// Always generic answer → no user enumeration
 		if ( ! $user || self::user_has_excluded_roles( $user->ID ) ) {
 			wp_safe_redirect( add_query_arg( 'requested', '1', wp_get_referer() ) );
 			exit;
 		}
 
-		// Genereer one-time nonce
-		$nonce = wp_create_nonce( 'z_login_once' );
-		update_user_meta( $user->ID, 'z_login_once_nonce', $nonce );
+		// Create login token for the user (and first delete the old ones, if any)
+		delete_user_meta( $user->ID, 'z_login_once_token' );
+		delete_user_meta( $user->ID, 'z_login_once_expires' );
 
+		$token = bin2hex( random_bytes( 32 ) ); // 64 chars
+		$hash  = hash( 'sha256', $token );
+		update_user_meta( $user->ID, 'z_login_once_token', $hash );
+		update_user_meta( $user->ID, 'z_login_once_expires', time() + HOUR_IN_SECONDS );
+		if( ! empty( $_SERVER['REMOTE_ADDR'] ) && ! empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
+			// use fingerprinting
+			update_user_meta(
+				$user->ID,
+				'z_login_once_fingerprint',
+				hash( 'sha256', sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) . sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) )
+			);
+		}
+
+		// The login link
 		$link_url = add_query_arg(
-			[ 'zloginonce' => $nonce ],
-			home_url()
+			[ 'zloginonce' => $token ],
+			is_multisite() ? network_home_url() : home_url()
 		);
 
-		// Mail (hergebruik je bestaande opties)
+		// Mail
 		$options = get_option( 'z_user_onetime_login_plugin_options' );
 
 		$subject = $options['mail_subject'];
@@ -436,12 +518,10 @@ class Z_User_Onetime_Login {
 			['Content-Type: text/html; charset=UTF-8']
 		);
 
-		wp_safe_redirect( add_query_arg( 'requested', '1', wp_get_referer() ) );
+		// wp_safe_redirect( add_query_arg( 'requested', '1', wp_get_referer() ) );
+		wp_safe_redirect( wp_login_url() . '?checkemail=confirm' );
 		exit;
 	}
 
 
 }
-
-
-

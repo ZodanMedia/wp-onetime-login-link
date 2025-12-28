@@ -85,6 +85,15 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
 			'z_user_onetime_login_plugin',
 			'z_user_onetime_login_main_section'
 		);
+
+        // Field: Use rate limiting
+		add_settings_field(
+			'z_user_onetime_login_user_request_rate_limit',
+			esc_html__('Rate limit', 'z-user-onetime-login'), 
+			'z_user_onetime_login_render_rate_limit_checkbox',
+			'z_user_onetime_login_plugin',
+			'z_user_onetime_login_main_section'
+		);
     }
 
     add_action( 'admin_init', 'z_user_onetime_login_register_settings' );
@@ -189,6 +198,18 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
 
 
 
+    function z_user_onetime_login_render_rate_limit_checkbox() {
+        $options = get_option( 'z_user_onetime_login_plugin_options' );
+        $use_rate_limit = isset( $options['use_rate_limit'] ) ? $options['use_rate_limit'] : false;
+        printf(
+            '<label><input type="checkbox" name="z_user_onetime_login_plugin_options[use_rate_limit]" value="1" %s> %s</label><br>',
+            checked( $use_rate_limit, true, false ),
+            esc_html( __('Use rate limiting to the user requests (max. xxx times per)', 'z-user-onetime-login') )
+        );
+    }
+
+
+
     function z_user_onetime_login_plugin_options_validate( $input ) {
         $output = array();
 
@@ -206,6 +227,10 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
 
         if ( isset( $input['allow_user_request'] ) ) {
             $output['allow_user_request'] = true;
+        }
+
+        if ( isset( $input['use_rate_limit'] ) ) {
+            $output['use_rate_limit'] = true;
         }
 
         if ( isset( $input['roles'] ) && is_array( $input['roles'] ) ) {
