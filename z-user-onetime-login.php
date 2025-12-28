@@ -7,7 +7,7 @@
  * Requires at least: 5.5
  * Tested up to: 6.9
  * Description: Let users login once without a password
- * Version: 0.0.2
+ * Version: 0.0.3
  * Author: Zodan
  * Author URI: https://zodan.nl
  * Text Domain: z-user-onetime-login
@@ -37,7 +37,7 @@ add_action( 'plugins_loaded', function() {
 class Z_User_Onetime_Login {
 
 	protected static $instance = NULL;
-	public $plugin_version = '0.0.2';
+	public $plugin_version = '0.0.3';
 	public $plugin_url = '';
 	public $plugin_path = '';
 

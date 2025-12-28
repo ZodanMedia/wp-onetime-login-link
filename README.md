@@ -4,7 +4,7 @@
 
 **Project page**
 
-See https://speelwei.zodan.nl/
+See https://plugins.zodan.nl/
 
 
 ## What does it do?

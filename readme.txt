@@ -85,7 +85,7 @@ If you have a feature suggestion, send us an email at [plugins@zodan.nl](plugins
 == Changelog ==
 
 = 0.0.2 =
-* Added possibility to request a login link
+* Added possibility to request a login link (on the login screen)
 
 = 0.0.1 =
 * Very first version of this plugin

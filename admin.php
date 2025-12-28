@@ -32,11 +32,19 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
 		);
         register_setting( 'z_user_onetime_login_plugin_options', 'z_user_onetime_login_plugin_options', $settings_args);
 
-		// Voeg settings section toe
+		// Add the introduction section
 		add_settings_section(
-			'z_user_onetime_login_main_section',
-			esc_html__('Global settings', 'z-user-onetime-login'),
-			'z_user_onetime_login_main_section_text',
+			'z_user_onetime_login_introduction_section',
+			esc_html__('Introduction', 'z-user-onetime-login'),
+			'z_user_onetime_login_introduction_section_text',
+			'z_user_onetime_login_plugin'
+		);
+
+		// Add the Roles section
+		add_settings_section(
+			'z_user_onetime_login_roles_section',
+			esc_html__('Roles', 'z-user-onetime-login'),
+			'z_user_onetime_login_roles_section_text',
 			'z_user_onetime_login_plugin'
 		);
 
@@ -47,7 +55,15 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
                 esc_html__( 'Some user roles should not have a fast login', 'z-user-onetime-login' ) . '</span>', 
 			'z_user_onetime_login_render_roles_checkboxes',
 			'z_user_onetime_login_plugin',
-			'z_user_onetime_login_main_section'
+			'z_user_onetime_login_roles_section'
+		);
+
+		// Add the Mail section
+		add_settings_section(
+			'z_user_onetime_login_mail_section',
+			esc_html__('Mail settings', 'z-user-onetime-login'),
+			'z_user_onetime_login_mail_section_text',
+			'z_user_onetime_login_plugin'
 		);
 
         // Field: Mail link text section
@@ -56,7 +72,7 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
 			esc_html__('Login link text', 'z-user-onetime-login'), 
 			'z_user_onetime_login_render_mail_linktext',
 			'z_user_onetime_login_plugin',
-			'z_user_onetime_login_main_section'
+			'z_user_onetime_login_mail_section'
 		);
 
         // Field: Mail subject section
@@ -65,7 +81,7 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
 			esc_html__('Mail subject', 'z-user-onetime-login'), 
 			'z_user_onetime_login_render_mail_subject',
 			'z_user_onetime_login_plugin',
-			'z_user_onetime_login_main_section'
+			'z_user_onetime_login_mail_section'
 		);
 
         // Field: Mail template section
@@ -74,7 +90,15 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
 			esc_html__('Mail content', 'z-user-onetime-login'), 
 			'z_user_onetime_login_render_mail_content',
 			'z_user_onetime_login_plugin',
-			'z_user_onetime_login_main_section'
+			'z_user_onetime_login_mail_section'
+		);
+
+		// Add the other options section
+		add_settings_section(
+			'z_user_onetime_login_other_options_section',
+			esc_html__('Other options', 'z-user-onetime-login'),
+			'z_user_onetime_login_other_options_section_text',
+			'z_user_onetime_login_plugin'
 		);
 
         // Field: Allow user request
@@ -83,7 +107,7 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
 			esc_html__('User request', 'z-user-onetime-login'), 
 			'z_user_onetime_login_render_user_request_checkbox',
 			'z_user_onetime_login_plugin',
-			'z_user_onetime_login_main_section'
+			'z_user_onetime_login_other_options_section'
 		);
 
         // Field: Use rate limiting
@@ -92,7 +116,7 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
 			esc_html__('Rate limit', 'z-user-onetime-login'), 
 			'z_user_onetime_login_render_rate_limit_checkbox',
 			'z_user_onetime_login_plugin',
-			'z_user_onetime_login_main_section'
+			'z_user_onetime_login_other_options_section'
 		);
     }
 
@@ -100,17 +124,31 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
 
 
 
-    function z_user_onetime_login_main_section_text() { 
-        echo '<p>' . esc_html__('Here you can set all the options for using the WordPress User One Time Login.', 'z-user-onetime-login') . '</p>';
-        echo '<ol>';
-        echo '<li>' . esc_html__('Select the user roles that CAN NOT have a fast login - e.g. Administrators', 'z-user-onetime-login') . '</li>';
-        echo '<li>' . esc_html__('Customize the link text', 'z-user-onetime-login') . '</li>';
-        echo '<li>' . esc_html__('Set the message users will see in the e-mail', 'z-user-onetime-login') . '</li>';
-        echo '</ol>';
+    function z_user_onetime_login_introduction_section_text() { 
+        echo '<p>' . esc_html__('With the One-time Login Link you can give users the option to log into Wordpress without a password.', 'z-user-onetime-login') . '</p>';
+       
         echo '<p>&nbsp;</p>';
     }
 
 
+    function z_user_onetime_login_roles_section_text_depricated() { 
+        echo '<table class="form-table" role="presentation"><tbody><tr><th scope="row">';
+        echo '<span class="z-warning">' . esc_html__('Please note', 'z-user-onetime-login') . '</span>';
+        echo '</th><td>';
+        echo esc_html__("While we've prioritized security in developing this plugin, we still recommend against using direct login for certain roles.", 'z-user-onetime-login');
+        echo '<br>';
+        echo esc_html__('Be wise and exclude roles like Administrators, Editors, Shop managers.', 'z-user-onetime-login');
+        echo '</td></tr></tbody></table>';
+    }
+
+
+    function z_user_onetime_login_roles_section_text() { 
+        echo '<p><strong class="z-warning">' . esc_html__('Please note', 'z-user-onetime-login') . '</strong> ';
+        echo esc_html__("While we've prioritized security in developing this plugin, we still recommend against using direct login for certain roles", 'z-user-onetime-login');
+        echo '<br>';
+        echo esc_html__('Be wise and exclude roles like Administrators, Editors, Shop managers.', 'z-user-onetime-login');
+        echo '</p>';
+    }
 
     function z_user_onetime_login_render_roles_checkboxes() {
         global $wp_roles;
@@ -128,7 +166,7 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
         }
     }
 
-
+    function z_user_onetime_login_mail_section_text() {}
 
     function z_user_onetime_login_render_mail_linktext() {
         $options = get_option( 'z_user_onetime_login_plugin_options' );
@@ -143,8 +181,6 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
         );
     }
 
-
-
     function z_user_onetime_login_render_mail_subject() {
         $options = get_option( 'z_user_onetime_login_plugin_options' );
 
@@ -156,15 +192,12 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
         );
     }
 
-
-
     function z_user_onetime_login_render_mail_content() {
         $options = get_option( 'z_user_onetime_login_plugin_options' );
 
 		$default_mail_content = '<p>'.__('Hello {{firstname}}', 'z-user-onetime-login').'</p>';
         $default_mail_content .= '<p>'.__('With the following link you can directly log in without having to enter your password.', 'z-user-onetime-login').'</p>';
         $default_mail_content .= '<p>{{zloginlink}}</p><p>'.__('This link can be used one time only.', 'z-user-onetime-login').'</p>';
-
 
         $mail_content =  ! empty( $options['mail_content'] ) ? $options['mail_content'] : $default_mail_content;
 
@@ -185,6 +218,7 @@ if ( !function_exists( 'z_user_onetime_login_register_settings' ) ) {
     }
 
 
+    function z_user_onetime_login_other_options_section_text() {}
 
     function z_user_onetime_login_render_user_request_checkbox() {
         $options = get_option( 'z_user_onetime_login_plugin_options' );
