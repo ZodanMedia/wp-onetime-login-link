@@ -71,20 +71,21 @@ This plugin is under active development. Any feature requests are welcome at [pl
 
 Yep. It does.
 
-= The Switch theme button on the front-end is not showing, can you help? =
-
-
-
 = Do you have plans to improve the plugin? =
 
 We currently have on our roadmap:
 * Adding bulk actions, in order to send (a selection of) users their One-time Login Link in one fell swoop.
 * Adding translations
 
-* Set the preference per user
-
 If you have a feature suggestion, send us an email at [plugins@zodan.nl](plugins@zodan.nl).
 
+
+== Screenshots ==
+
+1. Roles section of the Settings page where you can exclude roles.
+2. Mail settings section where you can customize the mail that will be sent to the user when a One-time Login Link is created.
+3. Other options for customizing the plugin, like the Link expiration time, whether or not users can request a link themselves and settings for the rate limits for these requests.
+4. The link that appears with the user in the list on the Users admin page. Simply click the link to send the users a new login token.
 
 
 == Changelog ==
