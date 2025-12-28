@@ -152,7 +152,7 @@ if ( !function_exists( 'z_onetime_login_link_register_settings' ) ) {
 
     function z_onetime_login_link_roles_section_text() { 
         echo '<p><strong class="z-warning zotll-warning">' . esc_html__('Please note', 'z-onetime-login-link') . '</strong> ';
-        echo esc_html__("While we've prioritized security in developing this plugin, we still recommend against using direct login for certain roles", 'z-onetime-login-link');
+        echo esc_html__("While we've prioritized security in developing this plugin, we still recommend against using direct login for certain roles.", 'z-onetime-login-link');
         echo '<br>';
         echo esc_html__('Be wise and exclude roles like Administrators, Editors, Shop managers.', 'z-onetime-login-link');
         echo '</p>';
