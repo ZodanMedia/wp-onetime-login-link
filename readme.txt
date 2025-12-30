@@ -74,7 +74,9 @@ Yep. It does.
 = Do you have plans to improve the plugin? =
 
 We currently have on our roadmap:
-* Adding bulk actions, in order to send (a selection of) users their One-time Login Link in one fell swoop.
+* Improve speed (using a separate -indexed- table)
+* Improve logging
+* Improve UX (e.g. adding a progress bar)
 * Adding translations
 
 If you have a feature suggestion, send us an email at [plugins@zodan.nl](plugins@zodan.nl).

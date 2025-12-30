@@ -25,7 +25,9 @@ Furthermore, the website administrator can customize the settings for
 ## What needs to be done?
 
 We currently have on our roadmap:
-* Adding bulk actions, in order to send (a selection of) users their One-time Login Link in one fell swoop.
+* Improve speed (using a separate -indexed- table)
+* Improve logging
+* Improve UX (e.g. adding a progress bar)
 * Adding translations
 
 This plugin is under active development.
