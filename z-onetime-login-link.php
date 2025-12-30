@@ -81,6 +81,8 @@ class z_onetime_login_link {
 
 		add_action( 'init', [ $this, 'handle_self_login_request' ] );
 
+		add_action( 'zloginonce_process_batch', [ $this, 'process_login_link_batch' ] );
+
 
 		if ( is_admin() ) {
 			add_action( 'admin_init', [ $this, 'handle_send_login_once_mail' ] );
@@ -92,16 +94,13 @@ class z_onetime_login_link {
 			add_filter( 'bulk_actions-users', [ $this, 'register_bulk_action' ] );
 			add_filter( 'handle_bulk_actions-users', [ $this, 'handle_bulk_action' ], 10, 3 );
 			add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_bulk_confirm_script' ] );
-			add_action( 'zloginonce_process_batch', [ $this, 'process_login_link_batch' ] );
 
-			include( $this->plugin_path . 'admin.php' );
 			add_filter ('user_row_actions', [ $this, 'add_send_zloginonce_link_mail' ], 10, 2) ;
 			add_action( 'admin_notices', function() {
 				if ( filter_has_var( INPUT_GET, 'zloginonce_sent' ) ) {
 					echo '<div class="notice notice-success"><p>'.esc_html(__('One time login link sent.','z-onetime-login-link')).'</p></div>';
 				}
 			});
-
 			add_action( 'admin_notices', function() {
 				if ( isset( $_GET['zloginonce_queued'] ) ) {
 					echo '<div class="notice notice-success"><p>';
@@ -111,14 +110,12 @@ class z_onetime_login_link {
 					);
 					echo '</p></div>';
 				}
-
 				if ( isset( $_GET['zloginonce_none'] ) ) {
 					echo '<div class="notice notice-warning"><p>';
 					echo esc_html__( 'No active users selected.', 'z-onetime-login-link' );
 					echo '</p></div>';
 				}
 			});
-
 			add_action( 'admin_notices', function() {
 				$log = get_option( 'zloginonce_log', [] );
 				if ( empty( $log ) ) {
@@ -138,9 +135,10 @@ class z_onetime_login_link {
 					);
 					echo '</li>';
 				}
-
 				echo '</ul></div>';
 			});
+
+			include( $this->plugin_path . 'admin.php' );
 
 		}
 
@@ -698,10 +696,7 @@ class z_onetime_login_link {
 
     public function handle_send_all_active_users() {
 
-		if (
-			empty( $_GET['action'] ) ||
-			$_GET['action'] !== 'zloginonce_send_all_active'
-		) {
+		if ( empty( $_GET['action'] ) || $_GET['action'] !== 'zloginonce_send_all_active' ) {
 			return;
 		}
 
@@ -742,7 +737,7 @@ class z_onetime_login_link {
 		$this->log_event( 'queued_all', count( $queue ) );
 
 		if ( ! wp_next_scheduled( 'zloginonce_process_batch' ) ) {
-			wp_schedule_single_event( time() + 5, 'zloginonce_process_batch' );
+			wp_schedule_single_event( time() + 10, 'zloginonce_process_batch' );
 		}
 
 		wp_safe_redirect(
@@ -797,7 +792,7 @@ class z_onetime_login_link {
 
 		// Start cron
 		if ( ! wp_next_scheduled( 'zloginonce_process_batch' ) ) {
-			wp_schedule_single_event( time() + 5, 'zloginonce_process_batch' );
+			wp_schedule_single_event( time() + 10, 'zloginonce_process_batch' );
 		}
 
 		return add_query_arg(
@@ -811,19 +806,26 @@ class z_onetime_login_link {
 
     public function process_login_link_batch() {
 
+		write2log('Starting process_login_link_batch');
+
 		$queue = get_transient( 'zloginonce_bulk_queue' );
 
 		if ( empty( $queue ) || ! is_array( $queue ) ) {
+			write2log('No Queue. Still tring to delete transient');
 			delete_transient( 'zloginonce_bulk_queue' );
 			return;
+		} else {
+			write2log('Queue: '.count($queue).' items');
 		}
 
 		$batch_size = 25;
 		$batch      = array_splice( $queue, 0, $batch_size );
 
-		foreach ( $batch as $user_id ) {
+		write2log('Items in batch: '. count($batch));
+		$this->log_event( 'batch_sent', count( $batch ) );
 
-			$this->log_event( 'batch_sent', count( $batch ) );
+		foreach ( $batch as $user_id ) {
+			write2log('User: '. $user_id);
 
 			$user = get_user_by( 'id', $user_id );
 			if ( ! $user ) {
@@ -881,6 +883,9 @@ class z_onetime_login_link {
     protected function log_event( $type, $count = 0 ) {
 
 		$log = get_option( 'zloginonce_log', [] );
+		if(empty($log) || ! is_array($log) ) {
+			$log = array();
+		}
 
 		$log[] = [
 			'time'  => current_time( 'mysql' ),
@@ -898,3 +903,15 @@ class z_onetime_login_link {
 	}
 
 }
+
+
+
+// add_action( 'zloginonce_process_batch', 'z_faux_process_login_link_batch');
+// function z_faux_process_login_link_batch(){
+// 	write2log('z_faux_process_login_link_batch was triggered');
+// 	if ( is_plugin_active( 'z-onetime-login-link/z-onetime-login-link.php' ) ) {
+// 		$instance = z_onetime_login_link::get_instance();
+// 		$instance->plugin_setup();
+// 		$instance->process_login_link_batch();
+// 	} 
+// }
