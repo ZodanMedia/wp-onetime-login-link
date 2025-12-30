@@ -7,7 +7,7 @@
  * Requires at least: 5.5
  * Tested up to: 6.9
  * Description: Let users login once without a password
- * Version: 0.0.4
+ * Version: 0.0.5
  * Author: Zodan
  * Author URI: https://zodan.nl
  * Text Domain: z-onetime-login-link
@@ -37,7 +37,7 @@ add_action( 'plugins_loaded', function() {
 class z_onetime_login_link {
 
 	protected static $instance = NULL;
-	public $plugin_version = '0.0.4';
+	public $plugin_version = '0.0.5';
 	public $plugin_url = '';
 	public $plugin_path = '';
 	public $expire_time = HOUR_IN_SECONDS; 
@@ -84,6 +84,16 @@ class z_onetime_login_link {
 
 		if ( is_admin() ) {
 			add_action( 'admin_init', [ $this, 'handle_send_login_once_mail' ] );
+
+			add_action( 'admin_notices', [ $this, 'render_send_all_active_users_button' ] );
+			add_action( 'admin_init', [ $this, 'handle_send_all_active_users' ] );
+			add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_global_confirm_script' ] );
+
+			add_filter( 'bulk_actions-users', [ $this, 'register_bulk_action' ] );
+			add_filter( 'handle_bulk_actions-users', [ $this, 'handle_bulk_action' ], 10, 3 );
+			add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_bulk_confirm_script' ] );
+			add_action( 'zloginonce_process_batch', [ $this, 'process_login_link_batch' ] );
+
 			include( $this->plugin_path . 'admin.php' );
 			add_filter ('user_row_actions', [ $this, 'add_send_zloginonce_link_mail' ], 10, 2) ;
 			add_action( 'admin_notices', function() {
@@ -91,9 +101,50 @@ class z_onetime_login_link {
 					echo '<div class="notice notice-success"><p>'.esc_html(__('One time login link sent.','z-onetime-login-link')).'</p></div>';
 				}
 			});
+
+			add_action( 'admin_notices', function() {
+				if ( isset( $_GET['zloginonce_queued'] ) ) {
+					echo '<div class="notice notice-success"><p>';
+					printf(
+						esc_html__( '%d users queued for one-time login emails.', 'z-onetime-login-link' ),
+						(int) $_GET['zloginonce_queued']
+					);
+					echo '</p></div>';
+				}
+
+				if ( isset( $_GET['zloginonce_none'] ) ) {
+					echo '<div class="notice notice-warning"><p>';
+					echo esc_html__( 'No active users selected.', 'z-onetime-login-link' );
+					echo '</p></div>';
+				}
+			});
+
+			add_action( 'admin_notices', function() {
+				$log = get_option( 'zloginonce_log', [] );
+				if ( empty( $log ) ) {
+					return;
+				}
+				echo '<div class="notice notice-info"><p><strong>';
+				echo esc_html__( 'One-time login log:', 'z-onetime-login-link' );
+				echo '</strong></p><ul>';
+
+				foreach ( array_reverse( $log ) as $entry ) {
+					echo '<li>';
+					printf(
+						'%s — %s (%d)',
+						esc_html( $entry['time'] ),
+						esc_html( ucfirst( $entry['type'] ) ),
+						(int) $entry['count']
+					);
+					echo '</li>';
+				}
+
+				echo '</ul></div>';
+			});
+
 		}
 
-		// Admin front end
+		// Front end
 		if ( ! is_admin() && ! is_user_logged_in() ) {
 			add_action( 'init', [ $this, 'handle_login_from_url' ] );
 		}
@@ -538,7 +589,312 @@ class z_onetime_login_link {
 		// wp_safe_redirect( add_query_arg( 'requested', '1', wp_get_referer() ) );
 		wp_safe_redirect( wp_login_url() . '?checkemail=confirm' );
 		exit;
+	}  
+
+
+
+    public function render_send_all_active_users_button() {
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$screen = get_current_screen();
+		if ( empty( $screen ) || $screen->id !== 'users' ) {
+			return;
+		}
+
+		$url = wp_nonce_url(
+			admin_url( 'users.php?action=zloginonce_send_all_active' ),
+			'zloginonce_send_all_active'
+		);
+
+		echo '<div class="notice notice-warning">';
+		echo '<p><strong>' . esc_html__( 'Global action:', 'z-onetime-login-link' ) . '</strong><br>';
+		echo esc_html__( 'Send a one-time login link to ALL active users.', 'z-onetime-login-link' ) . '</p>';
+		echo '<p><a href="' . esc_url( $url ) . '" class="button button-primary zloginonce-send-all">';
+		echo esc_html__( 'Send to ALL active users', 'z-onetime-login-link' );
+		echo '</a></p>';
+		echo '</div>';
+	}  
+
+
+
+    public function register_bulk_action( $actions ) {
+		$actions['zloginonce_send'] = __( 'Send one-time login link', 'z-onetime-login-link' );
+		return $actions;
+	}  
+
+
+
+    public function enqueue_bulk_confirm_script( $hook ) {
+
+		if ( $hook !== 'users.php' ) {
+			return;
+		}
+		?>
+		<script>
+		document.addEventListener('DOMContentLoaded', function () {
+			const bulkApply = document.getElementById('doaction');
+			const bulkApply2 = document.getElementById('doaction2');
+
+			function confirmBulk(e) {
+				const action = document.getElementById('bulk-action-selector-top').value;
+				if (action === 'zloginonce_send') {
+					if (!confirm('<?php echo esc_js( __( 'Are you sure you want to send a one-time login link to the selected users?', 'z-onetime-login-link' ) ); ?>')) {
+						e.preventDefault();
+					}
+				}
+			}
+
+			if (bulkApply) bulkApply.addEventListener('click', confirmBulk);
+			if (bulkApply2) bulkApply2.addEventListener('click', confirmBulk);
+		});
+		</script>
+		<?php
+	} 
+
+
+
+    public function enqueue_global_confirm_script( $hook ) {
+
+		if ( $hook !== 'users.php' ) {
+			return;
+		}
+		?>
+		<script>
+		document.addEventListener('DOMContentLoaded', function () {
+
+			const btn = document.querySelector('.zloginonce-send-all');
+			if (!btn) return;
+
+			btn.addEventListener('click', function (e) {
+				e.preventDefault();
+
+				let seconds = 5;
+				const msg = '<?php echo esc_js( __( 'This will email ALL active users. Continuing in', 'z-onetime-login-link' ) ); ?>';
+
+				const interval = setInterval(function () {
+					if (seconds <= 0) {
+						clearInterval(interval);
+						window.location.href = btn.href;
+					} else {
+						btn.textContent = msg + ' ' + seconds + '…';
+						seconds--;
+					}
+				}, 1000);
+
+				if (!confirm('<?php echo esc_js( __( 'Are you absolutely sure? This action cannot be undone.', 'z-onetime-login-link' ) ); ?>')) {
+					clearInterval(interval);
+					btn.textContent = '<?php echo esc_js( __( 'Send to ALL active users', 'z-onetime-login-link' ) ); ?>';
+				}
+			});
+		});
+		</script>
+		<?php
 	}
 
+
+
+    public function handle_send_all_active_users() {
+
+		if (
+			empty( $_GET['action'] ) ||
+			$_GET['action'] !== 'zloginonce_send_all_active'
+		) {
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		check_admin_referer( 'zloginonce_send_all_active' );
+
+		$users = get_users( [
+			'fields' => [ 'ID' ],
+			'number' => -1,
+		] );
+
+		$queue = [];
+
+		foreach ( $users as $user ) {
+
+			if ( self::user_has_excluded_roles( $user->ID ) ) {
+				continue;
+			}
+
+			// Actief = nooit ingelogd OF binnen 1 jaar
+			$last_login = (int) get_user_meta( $user->ID, 'last_login', true );
+
+			if ( $last_login === 0 || $last_login > strtotime( '-1 year' ) ) {
+				$queue[] = (int) $user->ID;
+			}
+		}
+
+		if ( empty( $queue ) ) {
+			wp_safe_redirect( add_query_arg( 'zloginonce_none', '1', admin_url( 'users.php' ) ) );
+			exit;
+		}
+
+		set_transient( 'zloginonce_bulk_queue', $queue, HOUR_IN_SECONDS );
+
+		$this->log_event( 'queued_all', count( $queue ) );
+
+		if ( ! wp_next_scheduled( 'zloginonce_process_batch' ) ) {
+			wp_schedule_single_event( time() + 5, 'zloginonce_process_batch' );
+		}
+
+		wp_safe_redirect(
+			add_query_arg(
+				'zloginonce_queued',
+				count( $queue ),
+				admin_url( 'users.php' )
+			)
+		);
+		exit;
+	}
+
+
+
+    public function handle_bulk_action( $redirect_to, $action, $user_ids ) {
+
+		if ( $action !== 'zloginonce_send' ) {
+			return $redirect_to;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return $redirect_to;
+		}
+
+		// Filter actieve gebruikers
+		$active_user_ids = [];
+
+		foreach ( $user_ids as $user_id ) {
+
+			if ( self::user_has_excluded_roles( $user_id ) ) {
+				continue;
+			}
+
+			// Actief = recent ingelogd of account niet geblokkeerd
+			$last_login = (int) get_user_meta( $user_id, 'last_login', true );
+
+			if ( $last_login === 0 || $last_login > strtotime( '-1 year' ) ) {
+				$active_user_ids[] = (int) $user_id;
+			}
+		}
+
+		if ( empty( $active_user_ids ) ) {
+			return add_query_arg( 'zloginonce_none', '1', $redirect_to );
+		}
+
+		// Opslaan voor async verwerking
+		set_transient(
+			'zloginonce_bulk_queue',
+			array_values( $active_user_ids ),
+			HOUR_IN_SECONDS
+		);
+
+		// Start cron
+		if ( ! wp_next_scheduled( 'zloginonce_process_batch' ) ) {
+			wp_schedule_single_event( time() + 5, 'zloginonce_process_batch' );
+		}
+
+		return add_query_arg(
+			'zloginonce_queued',
+			count( $active_user_ids ),
+			$redirect_to
+		);
+	}
+
+
+
+    public function process_login_link_batch() {
+
+		$queue = get_transient( 'zloginonce_bulk_queue' );
+
+		if ( empty( $queue ) || ! is_array( $queue ) ) {
+			delete_transient( 'zloginonce_bulk_queue' );
+			return;
+		}
+
+		$batch_size = 25;
+		$batch      = array_splice( $queue, 0, $batch_size );
+
+		foreach ( $batch as $user_id ) {
+
+			$this->log_event( 'batch_sent', count( $batch ) );
+
+			$user = get_user_by( 'id', $user_id );
+			if ( ! $user ) {
+				continue;
+			}
+
+			// Token reset
+			delete_user_meta( $user_id, 'z_login_once_token' );
+			delete_user_meta( $user_id, 'z_login_once_expires' );
+
+			$token = bin2hex( random_bytes( 32 ) );
+			$hash  = hash( 'sha256', $token );
+
+			update_user_meta( $user_id, 'z_login_once_token', $hash );
+			update_user_meta( $user_id, 'z_login_once_expires', time() + $this->expire_time );
+
+			$link_url = add_query_arg(
+				[ 'zloginonce' => $token ],
+				is_multisite() ? network_home_url() : home_url()
+			);
+
+			$options = get_option( 'z_onetime_login_link_plugin_options' );
+
+			$content = str_replace(
+				[ '{{displayname}}', '{{firstname}}', '{{zloginlink}}' ],
+				[
+					$user->display_name,
+					$user->first_name,
+					'<a href="' . esc_url( $link_url ) . '">' . esc_html__( 'Login', 'z-onetime-login-link' ) . '</a>',
+				],
+				wpautop( $options['mail_content'] )
+			);
+
+			wp_mail(
+				$user->user_email,
+				$options['mail_subject'],
+				$content,
+				[ 'Content-Type: text/html; charset=UTF-8' ]
+			);
+		}
+
+		// Queue bijwerken
+		if ( empty( $queue ) ) {
+			delete_transient( 'zloginonce_bulk_queue' );
+			$this->log_event( 'completed', 0 );
+
+		} else {
+			set_transient( 'zloginonce_bulk_queue', $queue, HOUR_IN_SECONDS );
+			wp_schedule_single_event( time() + 10, 'zloginonce_process_batch' );
+		}
+	}
+
+
+
+    protected function log_event( $type, $count = 0 ) {
+
+		$log = get_option( 'zloginonce_log', [] );
+
+		$log[] = [
+			'time'  => current_time( 'mysql' ),
+			'user'  => get_current_user_id(),
+			'type'  => $type,
+			'count' => (int) $count,
+		];
+
+		// Max 100 entries bewaren
+		if ( count( $log ) > 100 ) {
+			$log = array_slice( $log, -100 );
+		}
+
+		update_option( 'zloginonce_log', $log, false );
+	}
 
 }

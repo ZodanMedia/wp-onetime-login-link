@@ -156,6 +156,14 @@ if ( !function_exists( 'z_onetime_login_link_register_settings' ) ) {
         echo '<br>';
         echo esc_html__('Be wise and exclude roles like Administrators, Editors, Shop managers.', 'z-onetime-login-link');
         echo '</p>';
+
+        $users_url = admin_url( 'users.php');
+        echo '<p><span class="dashicons dashicons-email-alt"></span> '.esc_html__( 'You can send a one-time login link to ALL active users from the', 'z-onetime-login-link' ). ' ';
+		printf('<a href="%s">%s</a>.',
+            esc_url( $users_url ),
+            esc_html__( 'users admin page', 'z-onetime-login-link' )
+        );
+        echo '</p>';        
     }   
 
 
