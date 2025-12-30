@@ -7,7 +7,7 @@
  * Requires at least: 5.5
  * Tested up to: 6.9
  * Description: Let users login once without a password
- * Version: 0.0.3
+ * Version: 0.0.4
  * Author: Zodan
  * Author URI: https://zodan.nl
  * Text Domain: z-onetime-login-link
@@ -37,7 +37,7 @@ add_action( 'plugins_loaded', function() {
 class z_onetime_login_link {
 
 	protected static $instance = NULL;
-	public $plugin_version = '0.0.3';
+	public $plugin_version = '0.0.4';
 	public $plugin_url = '';
 	public $plugin_path = '';
 	public $expire_time = HOUR_IN_SECONDS; 
@@ -146,14 +146,13 @@ class z_onetime_login_link {
 			return;
 		}
 
-
+		$hash = hash( 'sha256', $token );
 		// Find user by nonce (one-time mapping)
 		$users = get_users(
 			array(
 				'fields'     => array( 'ID' ),
-				'meta_key' => 'z_login_once_nonce', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key  -- This is a one-time operation, and there is no more appropriate functionality available
-				'meta_value' => $token, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value  -- This is a one-time operation, and there is no more appropriate functionality available
-				'number'     => 1,
+				'meta_key' => 'z_login_once_token', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key  -- This is a one-time operation, and there is no more appropriate functionality available
+				'meta_value' => $hash, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value  -- This is a one-time operation, and there is no more appropriate functionality available
 			)
 		);
 
@@ -164,6 +163,17 @@ class z_onetime_login_link {
 				[ 'response' => 403 ]
 			);
 		}
+
+		// Bail out if more users exist
+		// TODO in next version: separate, indexed table
+		if ( count( $users ) !== 1 ) {
+			wp_die(
+				esc_html__( 'Invalid or expired login link.', 'z-onetime-login-link' ),
+				esc_html__( 'Login error', 'z-onetime-login-link' ),
+				[ 'response' => 403 ]
+			);
+		}
+
 
 		$user_id = (int) $users[0]->ID;
 		$user    = get_user_by( 'id', $user_id );
@@ -194,16 +204,6 @@ class z_onetime_login_link {
 			);
 		}
 
-		// Verify token
-		$stored_hash = get_user_meta( $user_id, 'z_login_once_token', true );
-		if ( empty( $stored_hash ) || ! hash_equals( $stored_hash, hash( 'sha256', $token ) ) ) {
-			wp_die(
-				esc_html__( 'This login link is invalid or ahs already been used.', 'z-onetime-login-link' ),
-				esc_html__( 'Login error', 'z-onetime-login-link' ),
-				[ 'response' => 403 ]
-			);
-		}
-		
 
 		if( ! empty( $_SERVER['REMOTE_ADDR'] ) && ! empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
 			// use fingerprinting
