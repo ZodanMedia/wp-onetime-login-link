@@ -136,6 +136,15 @@ if ( !function_exists( 'z_onetime_login_link_register_settings' ) ) {
 			'z_onetime_login_link_plugin',
 			'z_onetime_login_link_other_options_section'
 		);
+
+        // Field: Use log for bulk mail
+		add_settings_field(
+			'z_onetime_login_link_bulk_mail_logging',
+			esc_html__('Log bulk mailings', 'z-onetime-login-link'), 
+			'z_onetime_login_link_render_bulk_mail_logging',
+			'z_onetime_login_link_plugin',
+			'z_onetime_login_link_other_options_section'
+		);
     }
 
     add_action( 'admin_init', 'z_onetime_login_link_register_settings' );   
@@ -297,6 +306,21 @@ if ( !function_exists( 'z_onetime_login_link_register_settings' ) ) {
             esc_html( $rate_limit_value),
             esc_html(__('seconds between requests', 'z-onetime-login-link')),
         );
+    }   
+
+
+
+    function z_onetime_login_link_render_bulk_mail_logging() {
+        $options = get_option( 'z_onetime_login_link_plugin_options' );
+
+        $use_bulk_mail_log = isset( $options['use_bulk_mail_log'] ) ? $options['use_bulk_mail_log'] : 0;
+
+        printf(
+            '<label><input type="checkbox" id="z_use_bulk_mail_log" name="z_onetime_login_link_plugin_options[use_bulk_mail_log]" value="1" %s> %s</label><br>',
+            checked( $use_bulk_mail_log, true, false ),
+            esc_html( __('Log bulk mail activities (number of users processed, scheduled cron jobs etc.)', 'z-onetime-login-link') )
+        );
+
     }   
 
 

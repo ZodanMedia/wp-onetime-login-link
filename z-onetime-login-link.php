@@ -7,7 +7,7 @@
  * Requires at least: 5.5
  * Tested up to: 6.9
  * Description: Let users login once without a password
- * Version: 0.0.5
+ * Version: 0.0.6
  * Author: Zodan
  * Author URI: https://zodan.nl
  * Text Domain: z-onetime-login-link
@@ -37,7 +37,8 @@ add_action( 'plugins_loaded', function() {
 class z_onetime_login_link {
 
 	protected static $instance = NULL;
-	public $plugin_version = '0.0.5';
+	public $plugin_version = '0.0.6';
+	public $plugin_name = 'z_onetime_login_link';
 	public $plugin_url = '';
 	public $plugin_path = '';
 	public $expire_time = HOUR_IN_SECONDS; 
@@ -123,7 +124,19 @@ class z_onetime_login_link {
 				}
 				echo '<div class="notice notice-info"><p><strong>';
 				echo esc_html__( 'One-time login log:', 'z-onetime-login-link' );
-				echo '</strong></p><ul>';
+				echo '</strong>';
+				
+				$action_url = add_query_arg( array( 
+					'page' => $this->plugin_name, 
+					'action' => 'z_onetimelogin_clear_log', 
+				), admin_url( 'options-general.php' ) );
+				$clear_log_url = wp_nonce_url(
+					$action_url,
+					'z_onetimelogin_clear_log_action',
+					'z_onetimelogin_clear_log_action'
+				);
+				echo ' | <a href="'.esc_url($clear_log_url).'">'. __( 'Clear log', 'z-onetime-login-link' ).'</a>';
+				echo '</p><ul>';
 
 				foreach ( array_reverse( $log ) as $entry ) {
 					echo '<li>';
@@ -137,6 +150,17 @@ class z_onetime_login_link {
 				}
 				echo '</ul></div>';
 			});
+
+			add_action( 'admin_notices', function() {
+				if( isset($_GET['zloginonce_log_cleared']) ) {
+					echo '<div class="notice notice-success"><p>';
+					esc_html_e( 'Log cleared', 'z-onetime-login-link' );
+					echo '</p></div>';
+				}
+			});
+
+
+			add_action( 'admin_init', array( $this, 'handle_clear_log_request' ) );
 
 			include( $this->plugin_path . 'admin.php' );
 
@@ -163,8 +187,9 @@ class z_onetime_login_link {
 
 
 
-    public static function add_plugin_settings_link( $links ) {
-		$settings_link = '<a href="options-general.php?page=z_onetime_login_link">' . __( 'Settings','z-onetime-login-link' ) . '</a>';
+    public function add_plugin_settings_link( $links ) {
+
+		$settings_link = '<a href="'.admin_url( 'options-general.php?page='.esc_attr($this->plugin_name)).'">' . __( 'Settings','z-onetime-login-link' ) . '</a>';
 		array_unshift( $links, $settings_link );
 		return $links;
 	}   
@@ -806,27 +831,19 @@ class z_onetime_login_link {
 
     public function process_login_link_batch() {
 
-		write2log('Starting process_login_link_batch');
-
 		$queue = get_transient( 'zloginonce_bulk_queue' );
 
 		if ( empty( $queue ) || ! is_array( $queue ) ) {
-			write2log('No Queue. Still tring to delete transient');
 			delete_transient( 'zloginonce_bulk_queue' );
 			return;
-		} else {
-			write2log('Queue: '.count($queue).' items');
 		}
 
 		$batch_size = 25;
 		$batch      = array_splice( $queue, 0, $batch_size );
 
-		write2log('Items in batch: '. count($batch));
 		$this->log_event( 'batch_sent', count( $batch ) );
 
 		foreach ( $batch as $user_id ) {
-			write2log('User: '. $user_id);
-
 			$user = get_user_by( 'id', $user_id );
 			if ( ! $user ) {
 				continue;
@@ -882,6 +899,10 @@ class z_onetime_login_link {
 
     protected function log_event( $type, $count = 0 ) {
 
+        $options = get_option( 'z_onetime_login_link_plugin_options' );
+		if( empty($options['use_bulk_mail_log']) ) {
+			return;
+		}
 		$log = get_option( 'zloginonce_log', [] );
 		if(empty($log) || ! is_array($log) ) {
 			$log = array();
@@ -902,16 +923,25 @@ class z_onetime_login_link {
 		update_option( 'zloginonce_log', $log, false );
 	}
 
+	public function handle_clear_log_request() {
+
+        if ( empty($_GET['action']) || $_GET['action'] !== 'z_onetimelogin_clear_log') {
+            return;
+        }
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        if ( empty($_GET['z_onetimelogin_clear_log_action']) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['z_onetimelogin_clear_log_action'] ) ), 'z_onetimelogin_clear_log_action' ) ) {
+            return;
+        }
+
+        // All fine, let's continue
+        update_option( 'zloginonce_log', array(), false );
+
+        wp_safe_redirect(
+            admin_url( 'options-general.php?page=' . $this->plugin_name . '&zloginonce_log_cleared=1' )
+        );
+        exit;
+    }
+
 }
-
-
-
-// add_action( 'zloginonce_process_batch', 'z_faux_process_login_link_batch');
-// function z_faux_process_login_link_batch(){
-// 	write2log('z_faux_process_login_link_batch was triggered');
-// 	if ( is_plugin_active( 'z-onetime-login-link/z-onetime-login-link.php' ) ) {
-// 		$instance = z_onetime_login_link::get_instance();
-// 		$instance->plugin_setup();
-// 		$instance->process_login_link_batch();
-// 	} 
-// }
