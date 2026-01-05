@@ -1,4 +1,4 @@
-# Z One-time Login Link
+# Zodan One-time Login Link
 > Allow users to login once without a password
 
 

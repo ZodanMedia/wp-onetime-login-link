@@ -1,16 +1,16 @@
 <?php
 /**
- * Plugin Name: Z One-time Login Link
+ * Plugin Name: Zodan One-time Login Link
  * Contributors: martenmoolenaar, zodannl
  * Plugin URI: https://plugins.zodan.nl/wordpress-onetime-login-link/
  * Tags: direct login, fast login, no password, theme development, development
  * Requires at least: 5.5
  * Tested up to: 6.9
  * Description: Let users login once without a password
- * Version: 0.0.6
+ * Version: 0.0.7
  * Author: Zodan
  * Author URI: https://zodan.nl
- * Text Domain: z-onetime-login-link
+ * Text Domain: zodan-onetime-login-link
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
  *
@@ -23,28 +23,39 @@ if ( !defined( 'WPINC' ) ) {
     die;
 }
 
+
+/**
+ * Some constants
+ * 
+ */
+if ( ! defined( 'zodan_oneTIME_LOGIN_LINK_VERSION' ) ) {
+	define( 'zodan_oneTIME_LOGIN_LINK_VERSION', '0.0.7' );
+}
+if ( ! defined( 'zodan_oneTIME_LOGIN_LINK_PLUGIN_FILE' ) ) {
+	define( 'zodan_oneTIME_LOGIN_LINK_PLUGIN_FILE', __FILE__ );
+}
+
+
 /**
  * Start: create an instance after the plugins have loaded
  * 
  */
 add_action( 'plugins_loaded', function() {
-	$instance = z_onetime_login_link::get_instance();
+	$instance = zodan_onetime_login_link::get_instance();
 	$instance->plugin_setup();
 } );
 
 
 
-class z_onetime_login_link {
+class zodan_onetime_login_link {
 
 	protected static $instance = NULL;
-	public $plugin_version = '0.0.6';
-	public $plugin_name = 'z_onetime_login_link';
+	public $plugin_version = zodan_oneTIME_LOGIN_LINK_VERSION;
+	public $plugin_name = 'zodan_onetime_login_link';
 	public $plugin_url = '';
 	public $plugin_path = '';
 	public $expire_time = HOUR_IN_SECONDS; 
-	public $rate_limit_value = MINUTE_IN_SECONDS * 10; // wait 10 min   
-
-
+	public $rate_limit_value = MINUTE_IN_SECONDS * 10; // wait 10 min 
 
     public static function get_instance() {
 		NULL === self::$instance and self::$instance = new self;
@@ -59,14 +70,11 @@ class z_onetime_login_link {
 
     public function plugin_setup() {
 
-		if ( ! defined( 'Z_ONETIME_LOGIN_LINK_VERSION' ) ) {
-			define( 'Z_ONETIME_LOGIN_LINK_VERSION', $this->plugin_version  );
-		}
-
 		$this->plugin_url = plugins_url( '/', __FILE__ );
 		$this->plugin_path = plugin_dir_path( __FILE__ );
 
-		$options = get_option( 'z_onetime_login_link_plugin_options' );
+		$options = get_option( 'zodan_onetime_login_link_plugin_options' );
+
 		if ( ! empty( $options['expire_time'] ) ) {
 			$this->expire_time = intval( $options['expire_time'] );
 		}
@@ -74,73 +82,119 @@ class z_onetime_login_link {
 			$this->rate_limit_value = intval( $options['rate_limit_value'] );
 		}
 
+		/**
+		 * Add a link to the settings on the plugins overview page
+		 */
 		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), [ $this, 'add_plugin_settings_link' ] );
 
+		/**
+		 * Modifying the login screen
+		 */
+		add_action('login_enqueue_scripts', [ $this, 'add_add_login_assets' ] );
 		add_action('login_enqueue_scripts', [ $this, 'add_request_link_after_login_nav' ] );
+		add_action( 'login_form_zodanloginonce', [ $this, 'render_zodanloginonce_form' ] );	
 
-		add_action( 'login_form_zloginonce', [ $this, 'render_zloginonce_form' ] );	
-
+		/**
+		 * Handle the request from the login screen
+		 */
 		add_action( 'init', [ $this, 'handle_self_login_request' ] );
 
-		add_action( 'zloginonce_process_batch', [ $this, 'process_login_link_batch' ] );
+		/**
+		 * Process any scheduled batches
+		 */
+		add_action( 'zodanloginonce_process_batch', [ $this, 'process_login_link_batch' ] );
+
+		/**
+		 * The main login action: see if we have a user trying to login without a password
+		 */
+		if ( ! is_admin() && ! is_user_logged_in() ) {
+			add_action( 'init', [ $this, 'handle_login_from_url' ] );
+		}
+
 
 
 		if ( is_admin() ) {
+			
+			/**
+			 * Add a send login link to each user on the user screen
+			 */
+			add_filter ('user_row_actions', [ $this, 'add_send_zodanloginonce_link_mail' ], 10, 2) ;
+
+			/**
+			 * Handle actions, if set
+			 */
 			add_action( 'admin_init', [ $this, 'handle_send_login_once_mail' ] );
-
-			add_action( 'admin_notices', [ $this, 'render_send_all_active_users_button' ] );
 			add_action( 'admin_init', [ $this, 'handle_send_all_active_users' ] );
-			add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_global_confirm_script' ] );
+			add_action( 'admin_init', array( $this, 'handle_clear_log_request' ) );
 
+			/**
+			 * Bulk actions for the users.php screen
+			 */
 			add_filter( 'bulk_actions-users', [ $this, 'register_bulk_action' ] );
 			add_filter( 'handle_bulk_actions-users', [ $this, 'handle_bulk_action' ], 10, 3 );
-			add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_bulk_confirm_script' ] );
 
-			add_filter ('user_row_actions', [ $this, 'add_send_zloginonce_link_mail' ], 10, 2) ;
+			/**
+			 * Add a button to the notices part of the users screen to send all users a mail
+			 */
+			add_action( 'admin_notices', [ $this, 'render_send_all_active_users_button' ] );
+
+			/**
+			 * Enqueue scripts and styles
+			 */
+		    add_action( 'admin_enqueue_scripts', [ $this, 'zodan_onetime_login_link_add_admin_scripts' ] );
+			add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_bulk_confirm_scripts' ] );
+
+			/**
+			 * Handle admin notices
+			 */
 			add_action( 'admin_notices', function() {
-				if ( filter_has_var( INPUT_GET, 'zloginonce_sent' ) ) {
-					echo '<div class="notice notice-success"><p>'.esc_html(__('One time login link sent.','z-onetime-login-link')).'</p></div>';
+				if ( filter_has_var( INPUT_GET, 'zodanloginonce_sent' ) ) {
+					echo '<div class="notice notice-success"><p>'.esc_html(__('One time login link sent.','zodan-onetime-login-link')).'</p></div>';
 				}
 			});
 			add_action( 'admin_notices', function() {
-				if ( isset( $_GET['zloginonce_queued'] ) ) {
+				$queued = filter_input( INPUT_GET, 'zodanloginonce_queued', FILTER_VALIDATE_INT );
+				if ( $queued !== null ) {
 					echo '<div class="notice notice-success"><p>';
 					printf(
-						esc_html__( '%d users queued for one-time login emails.', 'z-onetime-login-link' ),
-						(int) $_GET['zloginonce_queued']
+						// translators: $d is the number of users that were added to the mail queue
+						esc_html__( '%d users queued for one-time login emails.', 'zodan-onetime-login-link' ),
+						(int) $queued
 					);
 					echo '</p></div>';
 				}
-				if ( isset( $_GET['zloginonce_none'] ) ) {
+				$none = filter_input( INPUT_GET, 'zodanloginonce_none', FILTER_VALIDATE_BOOLEAN );
+				if ( $none ) {
 					echo '<div class="notice notice-warning"><p>';
-					echo esc_html__( 'No active users selected.', 'z-onetime-login-link' );
+					echo esc_html__( 'No active users selected.', 'zodan-onetime-login-link' );
 					echo '</p></div>';
 				}
 			});
 			add_action( 'admin_notices', function() {
-				$log = get_option( 'zloginonce_log', [] );
+				$log = get_option( 'zodanloginonce_log', [] );
 				if ( empty( $log ) ) {
 					return;
 				}
 				echo '<div class="notice notice-info"><p><strong>';
-				echo esc_html__( 'One-time login log:', 'z-onetime-login-link' );
+				echo esc_html__( 'One-time login log:', 'zodan-onetime-login-link' );
 				echo '</strong>';
 				
 				$action_url = add_query_arg( array( 
 					'page' => $this->plugin_name, 
-					'action' => 'z_onetimelogin_clear_log', 
+					'action' => 'zodan_onetimelogin_clear_log', 
 				), admin_url( 'options-general.php' ) );
 				$clear_log_url = wp_nonce_url(
 					$action_url,
-					'z_onetimelogin_clear_log_action',
-					'z_onetimelogin_clear_log_action'
+					'zodan_onetimelogin_clear_log_action',
+					'zodan_onetimelogin_clear_log_action'
 				);
-				echo ' | <a href="'.esc_url($clear_log_url).'">'. __( 'Clear log', 'z-onetime-login-link' ).'</a>';
+				echo ' | <a href="'.esc_url($clear_log_url).'">'. esc_html__( 'Clear log', 'zodan-onetime-login-link' ).'</a>';
 				echo '</p><ul>';
 
 				foreach ( array_reverse( $log ) as $entry ) {
 					echo '<li>';
 					printf(
+						// translators: $s, $s and $d are respectively the time of logging, the type of logging and the number of logged items
 						'%s — %s (%d)',
 						esc_html( $entry['time'] ),
 						esc_html( ucfirst( $entry['type'] ) ),
@@ -150,53 +204,63 @@ class z_onetime_login_link {
 				}
 				echo '</ul></div>';
 			});
-
 			add_action( 'admin_notices', function() {
-				if( isset($_GET['zloginonce_log_cleared']) ) {
+				$cleared = filter_input( INPUT_GET, 'zodanloginonce_log_cleared', FILTER_VALIDATE_INT );
+				if ( $cleared !== null ) {
 					echo '<div class="notice notice-success"><p>';
-					esc_html_e( 'Log cleared', 'z-onetime-login-link' );
+					esc_html_e( 'Log cleared', 'zodan-onetime-login-link' );
 					echo '</p></div>';
 				}
 			});
 
-
-			add_action( 'admin_init', array( $this, 'handle_clear_log_request' ) );
-
+			/**
+			 * Include the admin settings screens
+			 */
 			include( $this->plugin_path . 'admin.php' );
 
 		}
-
-		// Front end
-		if ( ! is_admin() && ! is_user_logged_in() ) {
-			add_action( 'init', [ $this, 'handle_login_from_url' ] );
-		}
-	}   
+	} 
 
 
-
+	/**
+	 * Check if the user has any of the roles than cannot log in without a password
+	 * 
+	 * @param (int) $user_id
+	 * @return (boolean)
+	 */  
     public static function user_has_excluded_roles( $user_id ) {
 
-		$options = get_option( 'z_onetime_login_link_plugin_options' );
+		$options = get_option( 'zodan_onetime_login_link_plugin_options' );
 		$roles = $options['roles'];
 		if ( empty( $roles ) ) return false;
 
 		$user = get_user_by('id', intval( $user_id ) );
 		
 		return ! empty( array_intersect( $roles, (array) $user->roles ) );
-	}   
+	} 
 
 
-
+	/**
+	 * Add a link to the plugin settings on the plugins overview screen
+	 * 
+	 * @param (array) $links
+	 * @return (array) $links
+	 */  
     public function add_plugin_settings_link( $links ) {
 
-		$settings_link = '<a href="'.admin_url( 'options-general.php?page='.esc_attr($this->plugin_name)).'">' . __( 'Settings','z-onetime-login-link' ) . '</a>';
+		$settings_link = '<a href="'.admin_url( 'options-general.php?page='.esc_attr($this->plugin_name)).'">' . __( 'Settings','zodan-onetime-login-link' ) . '</a>';
 		array_unshift( $links, $settings_link );
 		return $links;
-	}   
+	} 
 
 
-
-    public function handle_login_from_url() {
+	/**
+	 * =========================================================
+	 * Handle the login based on a login url with the logintoken
+	 * =========================================================
+	 * 
+	 */  
+   public function handle_login_from_url() {
 
 		// Already logged in? Bail out.
 		if ( is_user_logged_in() ) {
@@ -211,11 +275,11 @@ class z_onetime_login_link {
 		 */
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( empty( $_GET['zloginonce'] ) ) { 
+		if ( empty( $_GET['zodanloginonce'] ) ) { 
 			return;
 		}
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-    	$token = sanitize_text_field( wp_unslash( $_GET['zloginonce'] ) );
+    	$token = sanitize_text_field( wp_unslash( $_GET['zodanloginonce'] ) );
 		if ( empty( $token ) ) {
 			return;
 		}
@@ -232,8 +296,8 @@ class z_onetime_login_link {
 
 		if ( empty( $users ) ) {
 			wp_die(
-				esc_html__( 'Invalid or expired login link.', 'z-onetime-login-link' ),
-				esc_html__( 'Login error', 'z-onetime-login-link' ),
+				esc_html__( 'Invalid or expired login link.', 'zodan-onetime-login-link' ),
+				esc_html__( 'Login error', 'zodan-onetime-login-link' ),
 				[ 'response' => 403 ]
 			);
 		}
@@ -242,8 +306,8 @@ class z_onetime_login_link {
 		// TODO in next version: separate, indexed table
 		if ( count( $users ) !== 1 ) {
 			wp_die(
-				esc_html__( 'Invalid or expired login link.', 'z-onetime-login-link' ),
-				esc_html__( 'Login error', 'z-onetime-login-link' ),
+				esc_html__( 'Invalid or expired login link.', 'zodan-onetime-login-link' ),
+				esc_html__( 'Login error', 'zodan-onetime-login-link' ),
 				[ 'response' => 403 ]
 			);
 		}
@@ -254,16 +318,16 @@ class z_onetime_login_link {
 
 		if ( ! $user ) {
 			wp_die(
-				esc_html__( 'Invalid user.', 'z-onetime-login-link' ),
-				esc_html__( 'Login error', 'z-onetime-login-link' ),
+				esc_html__( 'Invalid user.', 'zodan-onetime-login-link' ),
+				esc_html__( 'Login error', 'zodan-onetime-login-link' ),
 				[ 'response' => 403 ]
 			);
 		}
 
 		if ( self::user_has_excluded_roles( $user_id ) ) {
 			wp_die(
-				esc_html__( 'Your role is excluded from fast login, please contact your website administrator.', 'z-onetime-login-link' ),
-				esc_html__( 'Login error', 'z-onetime-login-link' ),
+				esc_html__( 'Your role is excluded from fast login, please contact your website administrator.', 'zodan-onetime-login-link' ),
+				esc_html__( 'Login error', 'zodan-onetime-login-link' ),
 				[ 'response' => 403 ]
 			);
 		}
@@ -272,30 +336,27 @@ class z_onetime_login_link {
 
 		if ( empty( $expires ) || time() > $expires ) {
 			wp_die(
-				esc_html__( 'Your login token has expired.', 'z-onetime-login-link' ),
-				esc_html__( 'Login error', 'z-onetime-login-link' ),
+				esc_html__( 'Your login token has expired.', 'zodan-onetime-login-link' ),
+				esc_html__( 'Login error', 'zodan-onetime-login-link' ),
 				[ 'response' => 403 ]
 			);
 		}
-
 
 		if( ! empty( $_SERVER['REMOTE_ADDR'] ) && ! empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
 			// use fingerprinting
 			$fingerprint = get_user_meta( $user_id, 'z_login_once_fingerprint', true );
 			if ( $fingerprint !== hash( 'sha256', sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) . sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) ) ) {
 				wp_die(
-					esc_html__( 'Login link environment mismatch. Use the same browser/platform for both requesting and using the link.', 'z-onetime-login-link' ),
-					esc_html__( 'Login error', 'z-onetime-login-link' ),
+					esc_html__( 'Login link environment mismatch. Use the same browser/platform for both requesting and using the link.', 'zodan-onetime-login-link' ),
+					esc_html__( 'Login error', 'zodan-onetime-login-link' ),
 					[ 'response' => 403 ]
 				);
 			}
 		}
 
-
 		/**
-		 * =====================================================
-		 * 🌐 MULTISITE: switch after validation
-		 * =====================================================
+		 * MULTISITE: switch after validation
+		 * ---------
 		 */
 		$switched = false;
 
@@ -313,13 +374,10 @@ class z_onetime_login_link {
 			}
 		}
 
-
 		/**
-		 * =====================================================
-		 * 🔐 LOGIN
-		 * =====================================================
+		 * LOGIN
+		 * -----
 		 */
-
 		// Set WP authorisation cookie
 		wp_set_auth_cookie( $user_id, true, is_multisite() );
 
@@ -330,18 +388,15 @@ class z_onetime_login_link {
 		do_action( 'wp_login', $user->user_login, $user );	// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- We are not invoking a plugin-specific action, but actually activating wp_login
 
 		/**
-		 * =====================================================
-		 * 🔄 Delete the token → link is now invalid
-		 * =====================================================
+		 * Delete the token → link is now invalid
+		 * ----------------
 		 */
 		delete_user_meta( $user_id, 'z_login_once_token' );
 		delete_user_meta( $user_id, 'z_login_once_expires' );
 
-
 		/**
-		 * =====================================================
-		 * 🌐 MULTISITE: restore context
-		 * =====================================================
+		 * MULTISITE: restore context
+		 * ---------
 		 */
 		if ( $switched ) {
 			restore_current_blog();
@@ -355,7 +410,7 @@ class z_onetime_login_link {
 
 
 
-    public function add_send_zloginonce_link_mail( $actions, $user ) {
+    public function add_send_zodanloginonce_link_mail( $actions, $user ) {
 
 		if ( self::user_has_excluded_roles( $user->ID ) ) {
 			return $actions;
@@ -364,7 +419,7 @@ class z_onetime_login_link {
 		// Setup the mail link
 		$action_url = add_query_arg( array( 
 			'user_id' => $user->ID, 
-			'action' => 'add_send_zloginonce_link_mail', 
+			'action' => 'add_send_zodanloginonce_link_mail', 
 		), admin_url( 'users.php' ) );
 
 		$url = wp_nonce_url(
@@ -373,8 +428,8 @@ class z_onetime_login_link {
 			'z_send_login_once_link_nonce'
 		);
 
-		$actions['zloginonce'] =
-			'<a href="'.esc_url($url).'">'.__('Send login once link','z-onetime-login-link').'</a>';
+		$actions['zodanloginonce'] =
+			'<a href="'.esc_url($url).'">'.__('Send login once link','zodan-onetime-login-link').'</a>';
 
 		return $actions;
 
@@ -386,7 +441,7 @@ class z_onetime_login_link {
 
 		if (
 			empty($_GET['action']) ||
-			$_GET['action'] !== 'add_send_zloginonce_link_mail' ||
+			$_GET['action'] !== 'add_send_zodanloginonce_link_mail' ||
 			empty($_GET['user_id']) ||
 			empty($_GET['z_send_login_once_link_nonce'])
 		) {
@@ -426,12 +481,12 @@ class z_onetime_login_link {
 
 		// The login link
 		$link_url = add_query_arg(
-			[ 'zloginonce' => $token ],
+			[ 'zodanloginonce' => $token ],
 			is_multisite() ? network_home_url() : home_url()
 		);
 
 
-		$options = get_option( 'z_onetime_login_link_plugin_options' );
+		$options = get_option( 'zodan_onetime_login_link_plugin_options' );
 
 		$subject = $options['mail_subject'];
 		$linktext = $options['mail_linktext'] ?: $link_url;
@@ -451,7 +506,7 @@ class z_onetime_login_link {
 			['Content-Type: text/html; charset=UTF-8']
 		);
 
-		$redirect_url = admin_url( 'users.php?zloginonce_sent' );
+		$redirect_url = admin_url( 'users.php?zodanloginonce_sent' );
 		wp_safe_redirect($redirect_url);
 		exit;
 	}   
@@ -460,39 +515,50 @@ class z_onetime_login_link {
 
     public function add_request_link_after_login_nav() {
 
-		$options = get_option( 'z_onetime_login_link_plugin_options' );
+		$options = get_option( 'zodan_onetime_login_link_plugin_options' );
 		if ( empty( $options['allow_user_request'] ) ) {
 			return;
 		}
-				
-		$url = wp_login_url() . '?action=zloginonce';
+		$url = wp_login_url() . '?action=zodanloginonce';
+		$vars = array(
+			'requestLinkURL' => esc_url($url),
+			'requestLinkText' => esc_html__( 'Request a One-time Login Link', 'zodan-onetime-login-link' )
+		);
+		wp_localize_script( 'zodan-onetime-login-login-scripts', 'zOnetimeLoginLinkVars', $vars );
+	}
 
-		?><script>
-		document.addEventListener('DOMContentLoaded', function () {
-        	var nav = document.getElementById('nav');
-        	if (nav) {
-            	var p = document.createElement('p');
-            	p.id = 'zloginonce-request-link';
-            	p.innerHTML = '<a href="<?php echo esc_url( $url ); ?>"><?php
-					esc_html_e( 'Request a one-time login link', 'z-onetime-login-link' );
-				?></a>';
-            	nav.insertAdjacentElement('afterend', p);
-        	}
-    	});</script><style>#zloginonce-request-link{font-size:13px;margin-top: 10px;}</style><?php
-	}   
+
+
+    public function add_add_login_assets() {
+        $plugin_url = plugins_url( '/', __FILE__ );
+        $login_css = $plugin_url . 'assets/login-styles.css';
+		wp_enqueue_style(
+			'zodan-onetime_login_css',
+			esc_url($login_css),
+			array(), zodan_oneTIME_LOGIN_LINK_VERSION
+		);
+		$login_script = $plugin_url . 'assets/login-scripts.js';
+		wp_enqueue_script(
+			'zodan-onetime-login-login-scripts',
+			esc_url($login_script),
+			array(),
+			zodan_oneTIME_LOGIN_LINK_VERSION,
+			true
+		);
+	}  
 
 
 
     protected function is_rate_limited( $email ) {
 
-		$options = get_option( 'z_onetime_login_link_plugin_options' );
+		$options = get_option( 'zodan_onetime_login_link_plugin_options' );
 
 		if ( empty( $options['use_rate_limit'] ) ) {
 			return false;
 		}
 
 		$ip   = ! empty($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) : '';
-		$key  = 'zloginonce_rl_' . md5( $ip . $email );
+		$key  = 'zodanloginonce_rl_' . md5( $ip . $email );
 
 		if ( get_transient( $key ) ) {
 			return true;
@@ -504,7 +570,7 @@ class z_onetime_login_link {
 
 
 
-    public function render_zloginonce_form() {
+    public function render_zodanloginonce_form() {
 
 		if ( is_user_logged_in() ) {
 			wp_safe_redirect( admin_url() );
@@ -512,29 +578,29 @@ class z_onetime_login_link {
 		}
 
 		login_header(
-			__( 'Email login link', 'z-onetime-login-link' ),
-			'<p class="message">' . __( 'Enter your email address to receive a one-time login link.', 'z-onetime-login-link' ) . '</p>'
+			__( 'Email login link', 'zodan-onetime-login-link' ),
+			'<p class="message">' . __( 'Enter your email address to receive a One-time Login Link.', 'zodan-onetime-login-link' ) . '</p>'
 		);
 		?>
 
-		<form method="post" action="<?php echo esc_url( wp_login_url() . '?action=zloginonce' ); ?>">
+		<form method="post" action="<?php echo esc_url( wp_login_url() . '?action=zodanloginonce' ); ?>">
 			<p>
-				<label for="zloginonce_email">
-					<?php esc_html_e( 'Email address', 'z-onetime-login-link' ); ?>
+				<label for="zodanloginonce_email">
+					<?php esc_html_e( 'Email address', 'zodan-onetime-login-link' ); ?>
 				</label>
-				<input type="email" name="zloginonce_email" id="zloginonce_email" class="input" required>
+				<input type="email" name="zodanloginonce_email" id="zodanloginonce_email" class="input" required>
 			</p>
 
-			<?php wp_nonce_field( 'zloginonce_request', 'zloginonce_nonce' ); ?>
+			<?php wp_nonce_field( 'zodanloginonce_request', 'zodanloginonce_nonce' ); ?>
 
 			<p class="submit">
-				<input type="submit" class="button button-primary" value="<?php esc_attr_e( 'Send login link', 'z-onetime-login-link' ); ?>">
+				<input type="submit" class="button button-primary" value="<?php esc_attr_e( 'Send login link', 'zodan-onetime-login-link' ); ?>">
 			</p>
 		</form>
 
 		<p id="nav">
 			<a href="<?php echo esc_url( wp_login_url() ); ?>">
-				<?php esc_html_e( '← Back to login', 'z-onetime-login-link' ); ?>
+				<?php esc_html_e( '← Back to login', 'zodan-onetime-login-link' ); ?>
 			</a>
 		</p>
 
@@ -547,15 +613,15 @@ class z_onetime_login_link {
 
     public function handle_self_login_request() {
 
-		if ( empty($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'POST' || empty( $_POST['zloginonce_email'] ) || empty( $_POST['zloginonce_nonce'] ) ) {
+		if ( empty($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'POST' || empty( $_POST['zodanloginonce_email'] ) || empty( $_POST['zodanloginonce_nonce'] ) ) {
 			return;
 		}
 
-		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['zloginonce_nonce'] ) ), 'zloginonce_request' ) ) {
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['zodanloginonce_nonce'] ) ), 'zodanloginonce_request' ) ) {
 			wp_die( 'Nonce not verified' );
 		}
 
-		$email = sanitize_email( wp_unslash( $_POST['zloginonce_email'] ) );
+		$email = sanitize_email( wp_unslash( $_POST['zodanloginonce_email'] ) );
 		$user  = get_user_by( 'email', $email );
 
 		if ( $this->is_rate_limited( $email ) ) {
@@ -588,12 +654,12 @@ class z_onetime_login_link {
 
 		// The login link
 		$link_url = add_query_arg(
-			[ 'zloginonce' => $token ],
+			[ 'zodanloginonce' => $token ],
 			is_multisite() ? network_home_url() : home_url()
 		);
 
 		// Mail
-		$options = get_option( 'z_onetime_login_link_plugin_options' );
+		$options = get_option( 'zodan_onetime_login_link_plugin_options' );
 
 		$subject = $options['mail_subject'];
 		$content = str_replace(
@@ -628,15 +694,15 @@ class z_onetime_login_link {
 		}
 
 		$url = wp_nonce_url(
-			admin_url( 'users.php?action=zloginonce_send_all_active' ),
-			'zloginonce_send_all_active'
+			admin_url( 'users.php?action=zodanloginonce_send_all_active' ),
+			'zodanloginonce_send_all_active'
 		);
 
 		echo '<div class="notice notice-warning">';
-		echo '<p><strong>' . esc_html__( 'Global action:', 'z-onetime-login-link' ) . '</strong><br>';
-		echo esc_html__( 'Send a one-time login link to ALL active users.', 'z-onetime-login-link' ) . '</p>';
-		echo '<p><a href="' . esc_url( $url ) . '" class="button button-primary zloginonce-send-all">';
-		echo esc_html__( 'Send to ALL active users', 'z-onetime-login-link' );
+		echo '<p><strong>' . esc_html__( 'Global action:', 'zodan-onetime-login-link' ) . '</strong><br>';
+		echo esc_html__( 'Send a One-time Login Link to ALL active users.', 'zodan-onetime-login-link' ) . '</p>';
+		echo '<p><a href="' . esc_url( $url ) . '" class="button button-primary zodanloginonce-send-all">';
+		echo esc_html__( 'Send to ALL active users', 'zodan-onetime-login-link' );
 		echo '</a></p>';
 		echo '</div>';
 	}  
@@ -644,84 +710,82 @@ class z_onetime_login_link {
 
 
     public function register_bulk_action( $actions ) {
-		$actions['zloginonce_send'] = __( 'Send one-time login link', 'z-onetime-login-link' );
+		$actions['zodanloginonce_send'] = __( 'Send One-time Login Link', 'zodan-onetime-login-link' );
 		return $actions;
 	}  
 
 
 
-    public function enqueue_bulk_confirm_script( $hook ) {
+    /**
+	 * Enqueue default scripts
+	 * 
+	 */ 
+    public function zodan_onetime_login_link_add_admin_scripts( $hook ) {
+
+        if ( is_admin() ) {
+
+            $plugin_url = plugins_url( '/', __FILE__ );
+            $admin_css = $plugin_url . 'assets/admin-styles.css';
+            wp_enqueue_style( 'zodan-onetime-login-link-admin-styles', esc_url($admin_css), array(), zodan_oneTIME_LOGIN_LINK_VERSION );
+
+            $admin_js = $plugin_url . 'assets/admin-scripts.js';
+            wp_register_script( 'zodan-onetime-login-link-admin-scripts', esc_url( $admin_js ) , array( 'jquery' ), zodan_oneTIME_LOGIN_LINK_VERSION, array( 'in_footer' => true ) );
+            wp_localize_script('zodan-onetime-login-link-admin-scripts', 'zodan_onetime_login_link_admin', array(
+				'copiedText' => esc_html__('code copied', 'zodan-onetime-login-link'),
+			) );
+            wp_enqueue_script( 'zodan-onetime-login-link-admin-scripts' );
+        }
+    }  
+
+
+
+    /**
+	 * Enqueue bulk action scripts
+	 * 
+	 */ 
+    public function enqueue_bulk_confirm_scripts ( $hook ) {
 
 		if ( $hook !== 'users.php' ) {
 			return;
 		}
-		?>
-		<script>
-		document.addEventListener('DOMContentLoaded', function () {
-			const bulkApply = document.getElementById('doaction');
-			const bulkApply2 = document.getElementById('doaction2');
+        if ( is_admin() ) {
 
-			function confirmBulk(e) {
-				const action = document.getElementById('bulk-action-selector-top').value;
-				if (action === 'zloginonce_send') {
-					if (!confirm('<?php echo esc_js( __( 'Are you sure you want to send a one-time login link to the selected users?', 'z-onetime-login-link' ) ); ?>')) {
-						e.preventDefault();
-					}
-				}
-			}
+			$plugin_url = plugins_url( '/', __FILE__ );
+			$admin_user_actions_js = $plugin_url . 'assets/admin-user-actions-scripts.js';
+			wp_register_script( 'zodan-onetime-login-link-admin-users-actions-scripts', esc_url( $admin_user_actions_js ) , array( 'jquery' ), zodan_oneTIME_LOGIN_LINK_VERSION, array( 'in_footer' => true ) );
 
-			if (bulkApply) bulkApply.addEventListener('click', confirmBulk);
-			if (bulkApply2) bulkApply2.addEventListener('click', confirmBulk);
-		});
-		</script>
-		<?php
+			wp_localize_script('zodan-onetime-login-link-admin-users-actions-scripts', 'zOnetimeLoginLinkUserActionsBulkVars', array(
+				'triggerAllUsersMessage' => esc_html__( 'This will email ALL active users. Continuing in', 'zodan-onetime-login-link' ),
+				'confirmAllUsersMessage' => esc_html__( 'Are you absolutely sure? This action cannot be undone.', 'zodan-onetime-login-link' ),
+				'allUsersButtonText' => esc_html__( 'Send to ALL active users', 'zodan-onetime-login-link' ),
+				'confirmSelectedUsersMessage' => esc_html__( 'Are you sure you want to send a One-time Login Link to the selected users?', 'zodan-onetime-login-link' )
+			) );
+			wp_enqueue_script( 'zodan-onetime-login-link-admin-users-actions-scripts' );
+		}
+
 	} 
 
 
 
-    public function enqueue_global_confirm_script( $hook ) {
+ 
 
-		if ( $hook !== 'users.php' ) {
-			return;
-		}
-		?>
-		<script>
-		document.addEventListener('DOMContentLoaded', function () {
 
-			const btn = document.querySelector('.zloginonce-send-all');
-			if (!btn) return;
 
-			btn.addEventListener('click', function (e) {
-				e.preventDefault();
 
-				let seconds = 5;
-				const msg = '<?php echo esc_js( __( 'This will email ALL active users. Continuing in', 'z-onetime-login-link' ) ); ?>';
 
-				const interval = setInterval(function () {
-					if (seconds <= 0) {
-						clearInterval(interval);
-						window.location.href = btn.href;
-					} else {
-						btn.textContent = msg + ' ' + seconds + '…';
-						seconds--;
-					}
-				}, 1000);
 
-				if (!confirm('<?php echo esc_js( __( 'Are you absolutely sure? This action cannot be undone.', 'z-onetime-login-link' ) ); ?>')) {
-					clearInterval(interval);
-					btn.textContent = '<?php echo esc_js( __( 'Send to ALL active users', 'z-onetime-login-link' ) ); ?>';
-				}
-			});
-		});
-		</script>
-		<?php
-	}
+
+
+
+
+
+
 
 
 
     public function handle_send_all_active_users() {
 
-		if ( empty( $_GET['action'] ) || $_GET['action'] !== 'zloginonce_send_all_active' ) {
+		if ( empty( $_GET['action'] ) || $_GET['action'] !== 'zodanloginonce_send_all_active' ) {
 			return;
 		}
 
@@ -729,7 +793,7 @@ class z_onetime_login_link {
 			return;
 		}
 
-		check_admin_referer( 'zloginonce_send_all_active' );
+		check_admin_referer( 'zodanloginonce_send_all_active' );
 
 		$users = get_users( [
 			'fields' => [ 'ID' ],
@@ -753,21 +817,21 @@ class z_onetime_login_link {
 		}
 
 		if ( empty( $queue ) ) {
-			wp_safe_redirect( add_query_arg( 'zloginonce_none', '1', admin_url( 'users.php' ) ) );
+			wp_safe_redirect( add_query_arg( 'zodanloginonce_none', '1', admin_url( 'users.php' ) ) );
 			exit;
 		}
 
-		set_transient( 'zloginonce_bulk_queue', $queue, HOUR_IN_SECONDS );
+		set_transient( 'zodanloginonce_bulk_queue', $queue, HOUR_IN_SECONDS );
 
 		$this->log_event( 'queued_all', count( $queue ) );
 
-		if ( ! wp_next_scheduled( 'zloginonce_process_batch' ) ) {
-			wp_schedule_single_event( time() + 10, 'zloginonce_process_batch' );
+		if ( ! wp_next_scheduled( 'zodanloginonce_process_batch' ) ) {
+			wp_schedule_single_event( time() + 10, 'zodanloginonce_process_batch' );
 		}
 
 		wp_safe_redirect(
 			add_query_arg(
-				'zloginonce_queued',
+				'zodanloginonce_queued',
 				count( $queue ),
 				admin_url( 'users.php' )
 			)
@@ -779,7 +843,7 @@ class z_onetime_login_link {
 
     public function handle_bulk_action( $redirect_to, $action, $user_ids ) {
 
-		if ( $action !== 'zloginonce_send' ) {
+		if ( $action !== 'zodanloginonce_send' ) {
 			return $redirect_to;
 		}
 
@@ -805,23 +869,23 @@ class z_onetime_login_link {
 		}
 
 		if ( empty( $active_user_ids ) ) {
-			return add_query_arg( 'zloginonce_none', '1', $redirect_to );
+			return add_query_arg( 'zodanloginonce_none', '1', $redirect_to );
 		}
 
 		// Opslaan voor async verwerking
 		set_transient(
-			'zloginonce_bulk_queue',
+			'zodanloginonce_bulk_queue',
 			array_values( $active_user_ids ),
 			HOUR_IN_SECONDS
 		);
 
 		// Start cron
-		if ( ! wp_next_scheduled( 'zloginonce_process_batch' ) ) {
-			wp_schedule_single_event( time() + 10, 'zloginonce_process_batch' );
+		if ( ! wp_next_scheduled( 'zodanloginonce_process_batch' ) ) {
+			wp_schedule_single_event( time() + 10, 'zodanloginonce_process_batch' );
 		}
 
 		return add_query_arg(
-			'zloginonce_queued',
+			'zodanloginonce_queued',
 			count( $active_user_ids ),
 			$redirect_to
 		);
@@ -831,10 +895,10 @@ class z_onetime_login_link {
 
     public function process_login_link_batch() {
 
-		$queue = get_transient( 'zloginonce_bulk_queue' );
+		$queue = get_transient( 'zodanloginonce_bulk_queue' );
 
 		if ( empty( $queue ) || ! is_array( $queue ) ) {
-			delete_transient( 'zloginonce_bulk_queue' );
+			delete_transient( 'zodanloginonce_bulk_queue' );
 			return;
 		}
 
@@ -860,18 +924,18 @@ class z_onetime_login_link {
 			update_user_meta( $user_id, 'z_login_once_expires', time() + $this->expire_time );
 
 			$link_url = add_query_arg(
-				[ 'zloginonce' => $token ],
+				[ 'zodanloginonce' => $token ],
 				is_multisite() ? network_home_url() : home_url()
 			);
 
-			$options = get_option( 'z_onetime_login_link_plugin_options' );
+			$options = get_option( 'zodan_onetime_login_link_plugin_options' );
 
 			$content = str_replace(
 				[ '{{displayname}}', '{{firstname}}', '{{zloginlink}}' ],
 				[
 					$user->display_name,
 					$user->first_name,
-					'<a href="' . esc_url( $link_url ) . '">' . esc_html__( 'Login', 'z-onetime-login-link' ) . '</a>',
+					'<a href="' . esc_url( $link_url ) . '">' . esc_html__( 'Login', 'zodan-onetime-login-link' ) . '</a>',
 				],
 				wpautop( $options['mail_content'] )
 			);
@@ -886,12 +950,12 @@ class z_onetime_login_link {
 
 		// Queue bijwerken
 		if ( empty( $queue ) ) {
-			delete_transient( 'zloginonce_bulk_queue' );
+			delete_transient( 'zodanloginonce_bulk_queue' );
 			$this->log_event( 'completed', 0 );
 
 		} else {
-			set_transient( 'zloginonce_bulk_queue', $queue, HOUR_IN_SECONDS );
-			wp_schedule_single_event( time() + 10, 'zloginonce_process_batch' );
+			set_transient( 'zodanloginonce_bulk_queue', $queue, HOUR_IN_SECONDS );
+			wp_schedule_single_event( time() + 10, 'zodanloginonce_process_batch' );
 		}
 	}
 
@@ -899,11 +963,11 @@ class z_onetime_login_link {
 
     protected function log_event( $type, $count = 0 ) {
 
-        $options = get_option( 'z_onetime_login_link_plugin_options' );
+        $options = get_option( 'zodan_onetime_login_link_plugin_options' );
 		if( empty($options['use_bulk_mail_log']) ) {
 			return;
 		}
-		$log = get_option( 'zloginonce_log', [] );
+		$log = get_option( 'zodanloginonce_log', [] );
 		if(empty($log) || ! is_array($log) ) {
 			$log = array();
 		}
@@ -920,28 +984,32 @@ class z_onetime_login_link {
 			$log = array_slice( $log, -100 );
 		}
 
-		update_option( 'zloginonce_log', $log, false );
+		update_option( 'zodanloginonce_log', $log, false );
 	}
 
-	public function handle_clear_log_request() {
 
-        if ( empty($_GET['action']) || $_GET['action'] !== 'z_onetimelogin_clear_log') {
+
+    public function handle_clear_log_request() {
+
+        if ( empty($_GET['action']) || $_GET['action'] !== 'zodan_onetimelogin_clear_log') {
             return;
         }
         if ( ! current_user_can( 'manage_options' ) ) {
             return;
         }
-        if ( empty($_GET['z_onetimelogin_clear_log_action']) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['z_onetimelogin_clear_log_action'] ) ), 'z_onetimelogin_clear_log_action' ) ) {
+        if ( empty($_GET['zodan_onetimelogin_clear_log_action']) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['zodan_onetimelogin_clear_log_action'] ) ), 'zodan_onetimelogin_clear_log_action' ) ) {
             return;
         }
 
         // All fine, let's continue
-        update_option( 'zloginonce_log', array(), false );
+        update_option( 'zodanloginonce_log', array(), false );
 
         wp_safe_redirect(
-            admin_url( 'options-general.php?page=' . $this->plugin_name . '&zloginonce_log_cleared=1' )
+            admin_url( 'options-general.php?page=' . $this->plugin_name . '&zodanloginonce_log_cleared=1' )
         );
         exit;
     }
+
+
 
 }

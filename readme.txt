@@ -1,4 +1,4 @@
-=== Z One-time Login Link ===
+=== Zodan One-time Login Link ===
 Contributors: martenmoolenaar, zodannl
 Plugin URI: https://plugins.zodan.nl/wordpress-onetime-login-link/
 Donate link: https://www.buymeacoffee.com/zodan
@@ -6,20 +6,28 @@ Tags: direct login, fast login, no password, theme development, development
 Requires at least: 5.5
 Tested up to: 6.9
 Description: Let users login once without a password
-Version: 0.0.6
-Stable tag: 0.0.6
+Version: 0.0.7
+Stable tag: 0.0.7
 Author: Zodan
 Author URI: https://zodan.nl
-Text Domain: z-onetime-login-link
+Text Domain: zodan-onetime-login-link
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
-Allow users to login once without a password.
+Allow users to securely log in *once* without a password.
 
 
 == Description ==
 
-In projects, we often encounter (groups of) users struggling with the sheer number of passwords they have to manage. Naturally, we support good password management - combined with other, additional security layers. However, we'd like to accommodate this group.
+🔗 Create secure, self-expiring, automatic login links for existing WordPress users. Login works just by opening the link.
+
+Using the One-time Login Link, users can login without username or password.
+
+You can customize when the login expires and which roles cannot use the One-time Login Link.
+
+= Why? =
+In projects, we sometimes encounter (groups of) users struggling with the sheer number of passwords they have to manage.
+Naturally, we prefer good password management, combined with other, additional security layers. However, we'd like to accommodate this group.
 
 This plugin allows you to log in *securely* without a password.
 
@@ -44,9 +52,9 @@ This plugin is under active development. Any feature requests are welcome at [pl
 = Install the One-time Login Link from within WordPress =
 
 1. Visit the plugins page within your dashboard and select ‘Add New’;
-1. Search for ‘Z One-time Login Link’;
-1. Activate the plugin from your Plugins page;
-1. Go to ‘after activation’ below.
+2. Search for ‘Zodan One-time Login Link’;
+3. Activate the plugin from your Plugins page;
+4. Go to ‘after activation’ below.
 
 = Install manually =
 
@@ -91,6 +99,11 @@ If you have a feature suggestion, send us an email at [plugins@zodan.nl](plugins
 
 
 == Changelog ==
+
+= 0.0.7 =
+* Changed the way the request link was added to the login page
+* Name change to satisfy the WP plugin check
+* Cleaned up the settings page
 
 = 0.0.6 =
 * Optimized logging functions for bulk mailing

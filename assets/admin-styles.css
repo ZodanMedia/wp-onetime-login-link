@@ -6,15 +6,15 @@
  * Author URI: https://zodan.nl
  */
 :root {
-    --z-padding-left: 6px;
-    --z-padding-right: 6px;
-    --zmam-color-red: #f00;
-    --zmam-color-bg-warning: #666;
-    --zmam-color-text-warning: #fff;
-    --zmam-color-bg-panel: #fff;
-    --zmam-color-text-panel: #fff;
+    --zotll-color-red: #f00;
+    --zotll-color-bg-warning: #d6d6d6;
+    --zotll-color-text-warning: #000;
+    --zotll-color-bg-panel: #fff;
+    --zotll-color-text-panel: #fff;
+    --zotll-tabs-line-thickness: 1px;
+    --zotll-tabs-line-color: #b6b4b4;
 }
-#adminmenu a[href*="?page=z_onetime_login_link"]:before {
+#adminmenu a[href*="?page=zodan_onetime_login_link"]:before {
     display: inline-block;
     content: "";
     width: 18px;
@@ -28,7 +28,7 @@
     background-size: cover;
     background-image: url("data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyBpZD0iQ2FwYV8xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZlcnNpb249IjEuMSIgdmlld0JveD0iMCAwIDUxMiA1MTIiPjxwYXRoIHN0eWxlPSJmaWxsOiNmZmYiIGQ9Ik0yNzMuMSwyNzEuMXYzNS4yYzAsOS43LTcuOSwxNy42LTE3LjYsMTcuNnMtMTcuNi03LjktMTcuNi0xNy42di0zNS4yYzAtOS43LDcuOS0xNy42LDE3LjYtMTcuNnMxNy42LDcuOSwxNy42LDE3LjZaTTI1NS41LDEzMC4xYy0yNC4zLDAtNDQuMSwxOS43LTQ0LjEsNDQuMXYyNi40aDg4LjF2LTI2LjRjMC0yNC4zLTE5LjctNDQuMS00NC4xLTQ0LjFoLjFaTTUxMiwyNTZjMCwxNDEuMi0xMTQuOCwyNTYtMjU2LDI1NlMwLDM5Ny4yLDAsMjU2LDExNC44LDAsMjU2LDBzMjU2LDExNC44LDI1NiwyNTZaTTM3OC44LDIzNS45YzAtMTkuNC0xNS44LTM1LjItMzUuMi0zNS4yaC04Ljh2LTI2LjRjMC00My44LTM1LjUtNzkuMy03OS4zLTc5LjNzLTc5LjMsMzUuNS03OS4zLDc5LjN2MjYuNGgtOC44Yy0xOS40LDAtMzUuMiwxNS44LTM1LjIsMzUuMnYxMDUuN2MwLDE5LjQsMTUuOCwzNS4yLDM1LjIsMzUuMmgxNzYuMmMxOS40LDAsMzUuMi0xNS44LDM1LjItMzUuMnYtMTA1LjdoMFoiLz48L3N2Zz4=")
 }
-#adminmenu .current a[href*="?page=z_onetime_login_link"]:before {
+#adminmenu .current a[href*="?page=zodan_onetime_login_link"]:before {
     opacity: 0.9;
 }
 .form-table th span.description {
@@ -49,13 +49,10 @@
 #zlinktext-example-frame.show {
 	display: inline-block;
 }
-.z-warning {
-    background: var(--zmam-color-bg-warning);
-    color: var(--zmam-color-text-warning);
-    padding: 0.25rem 1rem;
-    border-radius: 0.4rem;
-}
 .z-warning.zotll-warning {
+    background: var(--zotll-color-bg-warning);
+    color: var(--zotll-color-text-warning);
+    border-radius: 0.4rem;
     padding: 0.15rem 0.75rem;  
 }
 .zThanks {
@@ -95,4 +92,80 @@
 	40% { transform: scale(1); }
 	60% { transform: scale(1.2); }
 	100% { transform: scale(1); }
+}
+.zodan-settings-details-wrapper {
+    position: relative;
+    justify-content: start;
+    display: flex;
+    flex-wrap: wrap;
+}
+.zodan-settings-details-wrapper > details > summary {
+    padding: 0.5rem 1.5rem;
+    display: block;
+    order: 0;
+    border-radius: 6px 6px 0 0;
+    margin-right: calc(-1 * var(--zotll-tabs-line-thickness));
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    border: var(--zotll-tabs-line-thickness) solid var(--zotll-tabs-line-color);
+}
+.zodan-settings-details-wrapper > details[open] > summary {
+    border-bottom-color: transparent;
+}
+.details-tab::-webkit-details-marker,
+.zodan-settings-details-wrapper > details > summary::-webkit-details-marker {
+    display: none;
+}
+.zodan-settings-details-wrapper > details > summary h2 {
+    margin: 5px auto;
+    color: #909090;
+    font-size: 16px;
+}
+.zodan-settings-details-wrapper > details[open] > summary h2,
+.zodan-settings-details-wrapper > details > summary:hover h2,
+.zodan-settings-details-wrapper > details > summary:focus h2 {
+    color: #1d2327;
+}
+.zodan-settings-details-wrapper::after,
+.zodan-settings-details-wrapper::before {
+    content: "";
+    display: block;
+    position: relative;
+    height: 30px;
+    background-color: transparent;
+    top: 0;
+    border-bottom: var(--zotll-tabs-line-thickness) solid var(--zotll-tabs-line-color);
+}
+.zodan-settings-details-wrapper::after {
+    right: 0;
+    width: auto;
+    padding: 0.5rem 1.5rem;
+    flex: 1;
+}
+.zodan-settings-details-wrapper::before {
+    left: 0;
+    width: 8px;
+    padding: 0.5rem 0.25rem;
+}
+.zodan-settings-details-wrapper .details-content {
+    order: 1;
+    padding: 1rem;
+    width: 100%;
+}
+.zodan-settings-details-wrapper > details {
+    display: contents;
+}
+@supports selector(::details-content) {
+    .zodan-settings-details-wrapper > details[open]::details-content {
+        display: contents;
+    }
+}
+.details-content details {
+    margin: 1.5rem;
+}
+.details-content details summary {
+    font-weight: 600;
+}
+.form-table tr:has(#z_rate_limit_value:disabled) {
+    display: none;
 }
