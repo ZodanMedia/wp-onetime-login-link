@@ -7,7 +7,7 @@
  * Requires at least: 5.5
  * Tested up to: 6.9
  * Description: Let users login once without a password
- * Version: 0.0.7
+ * Version: 0.0.8
  * Author: Zodan
  * Author URI: https://zodan.nl
  * Text Domain: zodan-onetime-login-link
@@ -29,7 +29,7 @@ if ( !defined( 'WPINC' ) ) {
  * 
  */
 if ( ! defined( 'zodan_oneTIME_LOGIN_LINK_VERSION' ) ) {
-	define( 'zodan_oneTIME_LOGIN_LINK_VERSION', '0.0.7' );
+	define( 'zodan_oneTIME_LOGIN_LINK_VERSION', '0.0.8' );
 }
 if ( ! defined( 'zodan_oneTIME_LOGIN_LINK_PLUGIN_FILE' ) ) {
 	define( 'zodan_oneTIME_LOGIN_LINK_PLUGIN_FILE', __FILE__ );
@@ -342,15 +342,19 @@ class zodan_onetime_login_link {
 			);
 		}
 
-		if( ! empty( $_SERVER['REMOTE_ADDR'] ) && ! empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
-			// use fingerprinting
-			$fingerprint = get_user_meta( $user_id, 'z_login_once_fingerprint', true );
-			if ( $fingerprint !== hash( 'sha256', sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) . sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) ) ) {
-				wp_die(
-					esc_html__( 'Login link environment mismatch. Use the same browser/platform for both requesting and using the link.', 'zodan-onetime-login-link' ),
-					esc_html__( 'Login error', 'zodan-onetime-login-link' ),
-					[ 'response' => 403 ]
-				);
+		// use fingerprinting
+		if ( ! empty($options['use_fingerprinting']) ) {
+			if( ! empty( $_SERVER['REMOTE_ADDR'] ) && ! empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
+				$fingerprint = get_user_meta( $user_id, 'z_login_once_fingerprint', true );
+				if( ! empty( $fingerprint ) ) {
+					if ( $fingerprint !== hash( 'sha256', sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) . sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) ) ) {
+						wp_die(
+							esc_html__( 'Login link environment mismatch. Use the same browser/platform for both requesting and using the link.', 'zodan-onetime-login-link' ),
+							esc_html__( 'Login error', 'zodan-onetime-login-link' ),
+							[ 'response' => 403 ]
+						);
+					}
+				}
 			}
 		}
 
@@ -379,6 +383,7 @@ class zodan_onetime_login_link {
 		 * -----
 		 */
 		// Set WP authorisation cookie
+		wp_clear_auth_cookie();
 		wp_set_auth_cookie( $user_id, true, is_multisite() );
 
 		// if you want is_user_logged_in to work you should set `wp_set_current_user` explicityly
@@ -452,59 +457,8 @@ class zodan_onetime_login_link {
 		if ( ! wp_verify_nonce( $nonce, 'zsendloginoncelink' ) ) {
 			return;
 		}
-		// Bail out if the user does not exist
-		$user = get_user_by( 'id', intval($_GET['user_id']) );
-		if ( ! $user ) {
-			return;
-		}
-		// Bail out if the user has a role that prohibits fast login
-		if ( self::user_has_excluded_roles( $user->ID ) ) {
-			return;
-		}
 
-		// Create login token for the user (and first delete the old ones, if any)
-		delete_user_meta( $user->ID, 'z_login_once_token' );
-		delete_user_meta( $user->ID, 'z_login_once_expires' );
-
-		$token = bin2hex( random_bytes( 32 ) ); // 64 chars
-		$hash  = hash( 'sha256', $token );
-		update_user_meta( $user->ID, 'z_login_once_token', $hash );
-		update_user_meta( $user->ID, 'z_login_once_expires', time() + $this->expire_time);
-		if( ! empty( $_SERVER['REMOTE_ADDR'] ) && ! empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
-			// use fingerprinting
-			update_user_meta(
-				$user->ID,
-				'z_login_once_fingerprint',
-				hash( 'sha256', sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) . sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) )
-			);
-		}
-
-		// The login link
-		$link_url = add_query_arg(
-			[ 'zodanloginonce' => $token ],
-			is_multisite() ? network_home_url() : home_url()
-		);
-
-
-		$options = get_option( 'zodan_onetime_login_link_plugin_options' );
-
-		$subject = $options['mail_subject'];
-		$linktext = $options['mail_linktext'] ?: $link_url;
-
-		$link_html = '<a href="'.esc_url($link_url).'">'.$linktext.'</a>';
-
-		$content = str_replace(
-			['{{displayname}}','{{firstname}}','{{zloginlink}}'],
-			[$user->display_name, $user->first_name, $link_html],
-			wpautop($options['mail_content'])
-		);
-
-		wp_mail(
-			$user->user_email,
-			$subject,
-			$content,
-			['Content-Type: text/html; charset=UTF-8']
-		);
+		$this->send_login_link_to_user(intval($_GET['user_id']) );
 
 		$redirect_url = admin_url( 'users.php?zodanloginonce_sent' );
 		wp_safe_redirect($redirect_url);
@@ -635,47 +589,8 @@ class zodan_onetime_login_link {
 			exit;
 		}
 
-		// Create login token for the user (and first delete the old ones, if any)
-		delete_user_meta( $user->ID, 'z_login_once_token' );
-		delete_user_meta( $user->ID, 'z_login_once_expires' );
+		$this->send_login_link_to_user( $user->ID, true );
 
-		$token = bin2hex( random_bytes( 32 ) ); // 64 chars
-		$hash  = hash( 'sha256', $token );
-		update_user_meta( $user->ID, 'z_login_once_token', $hash );
-		update_user_meta( $user->ID, 'z_login_once_expires', time() + $this->expire_time );
-		if( ! empty( $_SERVER['REMOTE_ADDR'] ) && ! empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
-			// use fingerprinting
-			update_user_meta(
-				$user->ID,
-				'z_login_once_fingerprint',
-				hash( 'sha256', sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) . sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) )
-			);
-		}
-
-		// The login link
-		$link_url = add_query_arg(
-			[ 'zodanloginonce' => $token ],
-			is_multisite() ? network_home_url() : home_url()
-		);
-
-		// Mail
-		$options = get_option( 'zodan_onetime_login_link_plugin_options' );
-
-		$subject = $options['mail_subject'];
-		$content = str_replace(
-			['{{displayname}}','{{firstname}}','{{zloginlink}}'],
-			[$user->display_name, $user->first_name, esc_url( $link_url )],
-			wpautop( $options['mail_content'] )
-		);
-
-		wp_mail(
-			$user->user_email,
-			$subject,
-			$content,
-			['Content-Type: text/html; charset=UTF-8']
-		);
-
-		// wp_safe_redirect( add_query_arg( 'requested', '1', wp_get_referer() ) );
 		wp_safe_redirect( wp_login_url() . '?checkemail=confirm' );
 		exit;
 	}  
@@ -908,44 +823,7 @@ class zodan_onetime_login_link {
 		$this->log_event( 'batch_sent', count( $batch ) );
 
 		foreach ( $batch as $user_id ) {
-			$user = get_user_by( 'id', $user_id );
-			if ( ! $user ) {
-				continue;
-			}
-
-			// Token reset
-			delete_user_meta( $user_id, 'z_login_once_token' );
-			delete_user_meta( $user_id, 'z_login_once_expires' );
-
-			$token = bin2hex( random_bytes( 32 ) );
-			$hash  = hash( 'sha256', $token );
-
-			update_user_meta( $user_id, 'z_login_once_token', $hash );
-			update_user_meta( $user_id, 'z_login_once_expires', time() + $this->expire_time );
-
-			$link_url = add_query_arg(
-				[ 'zodanloginonce' => $token ],
-				is_multisite() ? network_home_url() : home_url()
-			);
-
-			$options = get_option( 'zodan_onetime_login_link_plugin_options' );
-
-			$content = str_replace(
-				[ '{{displayname}}', '{{firstname}}', '{{zloginlink}}' ],
-				[
-					$user->display_name,
-					$user->first_name,
-					'<a href="' . esc_url( $link_url ) . '">' . esc_html__( 'Login', 'zodan-onetime-login-link' ) . '</a>',
-				],
-				wpautop( $options['mail_content'] )
-			);
-
-			wp_mail(
-				$user->user_email,
-				$options['mail_subject'],
-				$content,
-				[ 'Content-Type: text/html; charset=UTF-8' ]
-			);
+			$this->send_login_link_to_user( $user_id );
 		}
 
 		// Queue bijwerken
@@ -957,6 +835,71 @@ class zodan_onetime_login_link {
 			set_transient( 'zodanloginonce_bulk_queue', $queue, HOUR_IN_SECONDS );
 			wp_schedule_single_event( time() + 10, 'zodanloginonce_process_batch' );
 		}
+	}
+
+
+
+	public function send_login_link_to_user( $user_id = 0, $usefingerprinting = false ) {
+
+		$options = get_option( 'zodan_onetime_login_link_plugin_options' );
+
+		$user = get_user_by( 'id', intval($user_id) );
+		// Bail out if the user does not exist
+		if ( ! $user ) {
+			return;
+		}
+		// Bail out if the user has a role that prohibits fast login
+		if ( self::user_has_excluded_roles( $user->ID ) ) {
+			return;
+		}
+
+		// Delete old tokens, if any
+		delete_user_meta( $user->ID, 'z_login_once_token' );
+		delete_user_meta( $user->ID, 'z_login_once_expires' );
+		delete_user_meta( $user->ID, 'z_login_once_fingerprint' );
+
+		// Prepare fingerprinting
+		if ( $usefingerprinting === 'true' && ! empty($options['use_fingerprinting']) ) {
+			if( ! empty( $_SERVER['REMOTE_ADDR'] ) && ! empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
+				// use fingerprinting
+				update_user_meta(
+					$user->ID,
+					'z_login_once_fingerprint',
+					hash( 'sha256', sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) . sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) )
+				);
+			}
+		}
+
+		// Create login token for the user
+		$token = bin2hex( random_bytes( 32 ) ); // 64 chars
+		$hash  = hash( 'sha256', $token );
+
+		update_user_meta( $user->ID, 'z_login_once_token', $hash );
+		update_user_meta( $user->ID, 'z_login_once_expires', time() + $this->expire_time );
+
+		// Create login link
+		$link_url = add_query_arg(
+			[ 'zodanloginonce' => $token ],
+			is_multisite() ? network_home_url() : home_url()
+		);
+
+		// Prepare content
+		$subject = $options['mail_subject'];
+		$linktext = $options['mail_linktext'] ?: $link_url;
+		$link_html = '<a href="'.esc_url($link_url).'">'.esc_html($linktext).'</a>';
+		$content = str_replace(
+			['{{displayname}}','{{firstname}}','{{zloginlink}}'],
+			[$user->display_name, $user->first_name, $link_html],
+			wpautop($options['mail_content'])
+		);
+
+		// Sendmail
+		wp_mail(
+			$user->user_email,
+			$subject,
+			$content,
+			[ 'Content-Type: text/html; charset=UTF-8' ]
+		);
 	}
 
 

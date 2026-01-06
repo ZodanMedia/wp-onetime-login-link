@@ -131,7 +131,7 @@
     content: "";
     display: block;
     position: relative;
-    height: 30px;
+    height: calc(28px + var(--zotll-tabs-line-thickness);)
     background-color: transparent;
     top: 0;
     border-bottom: var(--zotll-tabs-line-thickness) solid var(--zotll-tabs-line-color);

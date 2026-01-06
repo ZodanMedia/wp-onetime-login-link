@@ -137,6 +137,15 @@ if ( !function_exists( 'zodan_onetime_login_link_register_settings' ) ) {
 			'zodan_onetime_login_link_other_options_section'
 		);
 
+        // Field: Use fingerprinting for extra security
+		add_settings_field(
+			'zodan_onetime_login_link_bulk_use_fingerprinting',
+			esc_html__('Use fingerprinting', 'zodan-onetime-login-link'), 
+			'zodan_onetime_login_link_render_fingerprinting_checkbox',
+			'zodan_onetime_login_link_plugin',
+			'zodan_onetime_login_link_other_options_section'
+		);
+
         // Field: Use log for bulk mail
 		add_settings_field(
 			'zodan_onetime_login_link_bulk_mail_logging',
@@ -320,6 +329,21 @@ if ( !function_exists( 'zodan_onetime_login_link_register_settings' ) ) {
 
 
 
+    function zodan_onetime_login_link_render_fingerprinting_checkbox() {
+        $options = get_option( 'zodan_onetime_login_link_plugin_options' );
+
+        $use_fingerprinting = isset( $options['use_fingerprinting'] ) ? $options['use_fingerprinting'] : 0;
+
+        printf(
+            '<label><input type="checkbox" id="z_use_fingerprinting" name="zodan_onetime_login_link_plugin_options[use_fingerprinting]" value="1" %s> %s</label><br>',
+            checked( $use_fingerprinting, true, false ),
+            esc_html( __('Use browser fingerprinting for extra security.<br>This requires the user to use the same browser (on the same device, from the same IP address) for both requesting the Login Link and using it.', 'zodan-onetime-login-link') )
+        );
+
+    }
+
+
+
     function zodan_onetime_login_link_plugin_options_validate( $input ) {
         $output = array();
 
@@ -345,6 +369,10 @@ if ( !function_exists( 'zodan_onetime_login_link_register_settings' ) ) {
 
         if ( isset( $input['use_rate_limit'] ) ) {
             $output['use_rate_limit'] = true;
+        }
+
+        if ( isset( $input['use_fingerprinting'] ) ) {
+            $output['use_fingerprinting'] = true;
         }
 
         if ( isset( $input['expire_time'] ) ) {
