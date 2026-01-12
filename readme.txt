@@ -6,11 +6,11 @@ Tags: direct login, fast login, no password, theme development, development
 Requires at least: 5.5
 Tested up to: 6.9
 Description: Let users login once without a password
-Version: 0.0.8
-Stable tag: 0.0.8
+Version: 0.0.10
+Stable tag: 0.0.10
 Author: Zodan
 Author URI: https://zodan.nl
-Text Domain: zodan-onetime-login-link
+Text Domain: zodan-one-time-login-link
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -99,6 +99,12 @@ If you have a feature suggestion, send us an email at [plugins@zodan.nl](plugins
 
 
 == Changelog ==
+
+= 0.0.10 =
+* Fixed use of wp_set_auth_cookie()
+
+= 0.0.9 =
+* Small code optimizations
 
 = 0.0.8 =
 * Fix bug with fingerprint mismatch due to not cleaning up old hashes
