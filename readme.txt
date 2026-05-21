@@ -4,7 +4,7 @@ Plugin URI: https://plugins.zodan.nl/wordpress-onetime-login-link/
 Donate link: https://www.buymeacoffee.com/zodan
 Tags: direct login, fast login, no password, theme development, development
 Requires at least: 5.5
-Tested up to: 6.9
+Tested up to: 7.0
 Description: Let users login once without a password
 Version: 0.0.10
 Stable tag: 0.0.10
